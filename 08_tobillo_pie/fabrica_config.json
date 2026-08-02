@@ -1,0 +1,34 @@
+{
+  "prompt_override": null,
+  "prompt_draft": null,
+  "prompt_override_version": null,
+  "prompt_draft_version": null,
+  "prompt_events": [
+    {
+      "fecha": "2026-07-21T19:53:05",
+      "usuario": "radiologo",
+      "accion": "aplicar_override",
+      "version_origen": "tobillo_pie-1.0",
+      "version_destino": "tobillo_pie-1.0+override.1",
+      "diff": "－ 1. Datos clínicos: [limpios, sin ruido administrativo]\n－ 2. Exploración: [RM/TC] [tobillo/pie/antepié] [lateralidad]\n－ 3. Hallazgos: [prosa integrada y ordenada por compartimentos]\n－ 4. Impresión diagnóstica: [solo patología relevante, líneas independientes]\n－ 5. Interpretación global\n－ 6. Análisis de oportunidades de mejora [cuando aporte valor]\n＋ Datos clínicos: [limpios, sin ruido administrativo]\n＋ Exploración: [RM/TC] [tobillo/pie/antepié] [lateralidad]\n＋ Hallazgos: [prosa integrada y ordenada por compartimentos]\n＋ Impresión diagnóstica: [solo patología relevante, líneas independientes]\n＋ Interpretación global\n＋ Análisis de oportunidades de mejora [cuando aporte valor]\n＋ - NO numerar los encabezados del informe PACS. Usar encabezados sin prefijos numéricos: “Datos clínicos:”, “Exploración:”, “Hallazgos:”, “Impresión diagnóstica:”, “Interpretación global” y “Análisis de oportunidades de mejora”.\n－   y después su consecuencia: “Os trigonum con signos de pinzamiento posterior”.\n＋ y después su consecuencia: “Os trigonum con signos de pinzamiento posterior”.\n－   ya descritas en Hallazgos. Preferir: “Hallazgos compatibles con fascitis plantar” y,\n－   si procede, “Rotura de espesor parcial de fibras profundas”.\n＋ ya descritas en Hallazgos. Preferir: “Hallazgos compatibles con fascitis plantar” y,\n＋ si procede, “Rotura de espesor parcial de fibras profundas”.\n－   articular, especialmente en el flexor largo del primer dedo. Exigir alteración tendinosa\n－   o cambios inflamatorios acompañantes.\n＋ articular, especialmente en el flexor largo del primer dedo. Exigir alteración tendinosa\n＋ o cambios inflamatorios acompañantes.\n－   diástasis patológica está valorada en condiciones sin carga.\n＋ diástasis patológica está valorada en condiciones sin carga.\n－   dedo, flexor largo de los dedos y extensores.\n＋ dedo, flexor largo de los dedos y extensores.\n－   y partes blandas. En estudios de pie y tobillo combinados, separar ambos territorios.\n＋ y partes blandas. En estudios de pie y tobillo combinados, separar ambos territorios.\n－   sin inventar el estadio cuando faltan datos.\n＋ sin inventar el estadio cuando faltan datos.\n－   alto grado y rotura completa según la continuidad fibrilar descrita.\n＋ alto grado y rotura completa según la continuidad fibrilar descrita.\n－   y estado de los retináculos cuando corresponda.\n＋ y estado de los retináculos cuando corresponda.\n－   deltoideo, seno del tarso y alineación dentro de las limitaciones de un estudio sin carga.\n＋ deltoideo, seno del tarso y alineación dentro de las limitaciones de un estudio sin carga.\n－   sea incipiente o limítrofe y correlacionar con la clínica.\n＋ sea incipiente o limítrofe y correlacionar con la clínica.\n－   hallazgos dudosos.\n＋ hallazgos dudosos.",
+      "motivo": "He actualizado el prompt para que los encabezados del informe PACS no lleven numeración."
+    },
+    {
+      "fecha": "2026-07-21T19:58:23",
+      "usuario": "radiologo",
+      "accion": "restaurar_base",
+      "version_origen": "tobillo_pie-1.0+override.1",
+      "version_destino": "tobillo_pie-1.0",
+      "diff": "－ Datos clínicos: [limpios, sin ruido administrativo]\n－ Exploración: [RM/TC] [tobillo/pie/antepié] [lateralidad]\n－ Hallazgos: [prosa integrada y ordenada por compartimentos]\n－ Impresión diagnóstica: [solo patología relevante, líneas independientes]\n－ Interpretación global\n－ Análisis de oportunidades de mejora [cuando aporte valor]\n＋ 1. Datos clínicos: [limpios, sin ruido administrativo]\n＋ 2. Exploración: [RM/TC] [tobillo/pie/antepié] [lateralidad]\n＋ 3. Hallazgos: [prosa integrada y ordenada por compartimentos]\n＋ 4. Impresión diagnóstica: [solo patología relevante, líneas independientes]\n＋ 5. Interpretación global\n＋ 6. Análisis de oportunidades de mejora [cuando aporte valor]\n－ - NO numerar los encabezados del informe PACS. Usar encabezados sin prefijos numéricos: “Datos clínicos:”, “Exploración:”, “Hallazgos:”, “Impresión diagnóstica:”, “Interpretación global” y “Análisis de oportunidades de mejora”.\n－ y después su consecuencia: “Os trigonum con signos de pinzamiento posterior”.\n＋   y después su consecuencia: “Os trigonum con signos de pinzamiento posterior”.\n－ ya descritas en Hallazgos. Preferir: “Hallazgos compatibles con fascitis plantar” y,\n－ si procede, “Rotura de espesor parcial de fibras profundas”.\n＋   ya descritas en Hallazgos. Preferir: “Hallazgos compatibles con fascitis plantar” y,\n＋   si procede, “Rotura de espesor parcial de fibras profundas”.\n－ articular, especialmente en el flexor largo del primer dedo. Exigir alteración tendinosa\n－ o cambios inflamatorios acompañantes.\n＋   articular, especialmente en el flexor largo del primer dedo. Exigir alteración tendinosa\n＋   o cambios inflamatorios acompañantes.\n－ diástasis patológica está valorada en condiciones sin carga.\n＋   diástasis patológica está valorada en condiciones sin carga.\n－ dedo, flexor largo de los dedos y extensores.\n＋   dedo, flexor largo de los dedos y extensores.\n－ y partes blandas. En estudios de pie y tobillo combinados, separar ambos territorios.\n＋   y partes blandas. En estudios de pie y tobillo combinados, separar ambos territorios.\n－ sin inventar el estadio cuando faltan datos.\n＋   sin inventar el estadio cuando faltan datos.\n－ alto grado y rotura completa según la continuidad fibrilar descrita.\n＋   alto grado y rotura completa según la continuidad fibrilar descrita.\n－ y estado de los retináculos cuando corresponda.\n＋   y estado de los retináculos cuando corresponda.\n－ deltoideo, seno del tarso y alineación dentro de las limitaciones de un estudio sin carga.\n＋   deltoideo, seno del tarso y alineación dentro de las limitaciones de un estudio sin carga.\n－ sea incipiente o limítrofe y correlacionar con la clínica.\n＋   sea incipiente o limítrofe y correlacionar con la clínica.\n－ hallazgos dudosos.\n＋   hallazgos dudosos.",
+      "motivo": "Restaurar prompt base versionado"
+    }
+  ],
+  "notas": [
+    {
+      "ts": "2026-07-21T19:53:05",
+      "resumen": "He actualizado el prompt para que los encabezados del informe PACS no lleven numeración."
+    }
+  ],
+  "version": 3,
+  "updated_at": "2026-07-21T19:58:23"
+}

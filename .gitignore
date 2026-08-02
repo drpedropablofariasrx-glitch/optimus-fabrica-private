@@ -1,0 +1,35 @@
+# Runtime local de IA: binarios, modelos, descargas y configuracion de la maquina.
+runtime/llama_cpp/*
+!runtime/llama_cpp/.gitkeep
+runtime/downloads/*
+!runtime/downloads/.gitkeep
+runtime/backups/*
+!runtime/backups/.gitkeep
+models/*
+!models/qwen/
+!models/qwen/.gitkeep
+logs/llama_cpp/*
+!logs/llama_cpp/.gitkeep
+logs/installer/*
+!logs/installer/.gitkeep
+config/local/*
+!config/local/.gitkeep
+!config/local/llama_runtime.example.env
+!config/local/provider_runtime.example.env
+# Entorno, datos de trabajo y credenciales locales: nunca se suben al repositorio.
+.venv/
+data/
+datasets/private/
+__pycache__/
+*.py[cod]
+00_APP/casos_*/
+00_APP/*.jsonl
+.env
+.env.*
+!.env.example
+*.gguf
+*.zip
+*.part
+*.tmp
+*.dll
+*.exe
