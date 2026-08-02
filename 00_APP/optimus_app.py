@@ -1532,7 +1532,10 @@ def route_modelos():
         modelos = listar_modelos_disponibles(proveedor, key)
     except Exception as e:
         return jsonify({"error": f"No se pudieron consultar modelos para {proveedor}: {e}"})
-    preferido = _modelo_configurado(proveedor) or (modelos[0] if modelos else DEFAULT_MODELS.get(proveedor) or DEFAULT_MODEL)
+    configurado = _modelo_configurado(proveedor)
+    # Una clave puede pertenecer a un proyecto con acceso distinto al modelo histórico
+    # configurado. En ese caso elegimos uno de los modelos que la API confirma disponibles.
+    preferido = configurado if configurado in modelos else (modelos[0] if modelos else configurado or DEFAULT_MODELS.get(proveedor) or DEFAULT_MODEL)
     return jsonify({"provider": proveedor, "models": modelos, "preferido": preferido})
 
 @app.route("/generar", methods=["POST"])
