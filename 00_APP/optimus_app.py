@@ -472,6 +472,25 @@ def generar_informe(caso_bruto, api_key, modelo=None, proveedor=None):
 
     raise ValueError(f"Proveedor no reconocido: {proveedor}. Usa openai, anthropic, deepseek, llama_cpp o mock.")
 
+
+def normalizar_formato_pacs_lumbar(informe):
+    """Elimina restos de Markdown; el informe lumbar se entrega como texto plano PACS."""
+    text = str(informe or "").replace("\r\n", "\n").replace("\r", "\n")
+    text = text.replace("**", "")
+    text = re.sub(
+        r"(?im)^[ \t]*\d+\.[ \t]*(Datos clínicos|Exploración|Hallazgos|Impresión diagnóstica)[ \t]*:?[ \t]*$",
+        lambda match: f"{match.group(1)}:",
+        text,
+    )
+    text = re.sub(
+        r"(?im)^[ \t]*[-•][ \t]*((?:L|S)\d[ \t]*[-–][ \t]*(?:L|S)\d[ \t]*:)",
+        lambda match: match.group(1),
+        text,
+    )
+    text = re.sub(r"(?im)^[ \t]*[-•][ \t]+", "", text)
+    text = re.sub(r"\n{3,}", "\n\n", text)
+    return text.strip()
+
 # ======================================================================
 #  4) INTERFAZ WEB (local)
 # ======================================================================
@@ -1679,6 +1698,8 @@ def route_generar():
         if "model_not_found" in msg or "does not have access to model" in msg:
             msg += "\n\nEse proyecto/API key no tiene acceso al modelo elegido. Pulsa 'Detectar modelos disponibles' y selecciona uno de la lista."
         return jsonify({"error":msg})
+    if current_region == "lumbar":
+        informe = normalizar_formato_pacs_lumbar(informe)
     return jsonify({"informe":informe, "flags":validar(informe, metadata_torax), "provider":proveedor, "model":modelo, "study_metadata":metadata_torax, "generation_metadata":LAST_GENERATION_METADATA})
 
 @app.route("/validar", methods=["POST"])
