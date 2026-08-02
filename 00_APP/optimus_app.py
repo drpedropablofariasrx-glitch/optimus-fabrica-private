@@ -94,15 +94,29 @@ PROMPT_VERSION = REGION_CONFIG.PROMPT_VERSION
 VALIDATOR_VERSION = REGION_CONFIG.VALIDATOR_VERSION
 DATASET_SCHEMA_VERSION = REGION_CONFIG.DATASET_SCHEMA_VERSION
 DEFAULT_PROVIDER = os.environ.get("OPTIMUS_PROVIDER", os.environ.get("LLM_PROVIDER", "openai")).strip().lower()
+
+
+def _modelo_entorno_o_predeterminado(env_name: str, predeterminado: str) -> str:
+    value = (os.environ.get(env_name, "") or "").strip()
+    return predeterminado if not value or value.lower().startswith("sk-") else value
+
+
 DEFAULT_MODELS = {
-    "openai": os.environ.get("OPENAI_MODEL", "gpt-4.1-mini"),
-    "anthropic": os.environ.get("ANTHROPIC_MODEL", "claude-sonnet-4-5"),
-    "deepseek": os.environ.get("DEEPSEEK_MODEL", "deepseek-chat"),
+    "openai": _modelo_entorno_o_predeterminado("OPENAI_MODEL", "gpt-4.1-mini"),
+    "anthropic": _modelo_entorno_o_predeterminado("ANTHROPIC_MODEL", "claude-sonnet-4-5"),
+    "deepseek": _modelo_entorno_o_predeterminado("DEEPSEEK_MODEL", "deepseek-chat"),
     "llama_cpp": os.environ.get("OPTIMUS_LLAMA_MODEL", ""),
     "mock": "mock-radiology",
 }
 DEFAULT_MODEL = DEFAULT_MODELS.get(DEFAULT_PROVIDER, DEFAULT_MODELS["openai"])
 LAST_GENERATION_METADATA = {}
+
+
+def _modelo_configurado(proveedor: str) -> str:
+    """Lee un modelo configurado sin permitir que una clave se use o exponga como modelo."""
+    _, _, env_model = _provider_env_names(proveedor)
+    value = (os.environ.get(env_model, "") if env_model else "").strip()
+    return "" if value.lower().startswith("sk-") else value
 
 
 def _llama_provider(modelo=None):
@@ -814,7 +828,7 @@ def _estado_proveedor(proveedor=None):
         "active_provider": proveedor,
         "provider_configured": bool(env_key and os.environ.get(env_key)),
         "provider_reachable": None,
-        "provider_model": os.environ.get(env_model, "") if env_model else "",
+        "provider_model": _modelo_configurado(proveedor),
         "provider_error_code": None,
     }
 
@@ -994,7 +1008,7 @@ def route_admin_chat():
     mensaje = (data.get("mensaje") or "").strip()
     proveedor, env_key, env_model = _provider_env_names(data.get("provider") or os.environ.get("LLM_PROVIDER") or DEFAULT_PROVIDER or "openai")
     key = (data.get("key") or "").strip() or os.environ.get(env_key, "")
-    modelo = (data.get("model") or os.environ.get(env_model) or DEFAULT_MODELS.get(proveedor) or DEFAULT_MODEL).strip()
+    modelo = (data.get("model") or _modelo_configurado(proveedor) or DEFAULT_MODELS.get(proveedor) or DEFAULT_MODEL).strip()
     if not mensaje:
         return jsonify({"error":"Mensaje vacío."})
     if not key:
@@ -1518,7 +1532,7 @@ def route_modelos():
         modelos = listar_modelos_disponibles(proveedor, key)
     except Exception as e:
         return jsonify({"error": f"No se pudieron consultar modelos para {proveedor}: {e}"})
-    preferido = os.environ.get(env_model) or (modelos[0] if modelos else DEFAULT_MODELS.get(proveedor) or DEFAULT_MODEL)
+    preferido = _modelo_configurado(proveedor) or (modelos[0] if modelos else DEFAULT_MODELS.get(proveedor) or DEFAULT_MODEL)
     return jsonify({"provider": proveedor, "models": modelos, "preferido": preferido})
 
 @app.route("/generar", methods=["POST"])
@@ -1527,7 +1541,7 @@ def route_generar():
     caso = (data.get("caso") or "").strip()
     proveedor, env_key, env_model = _provider_env_names(data.get("provider") or os.environ.get("LLM_PROVIDER") or DEFAULT_PROVIDER or "openai")
     key = (data.get("key") or "").strip() or os.environ.get(env_key, "")
-    modelo = (data.get("model") or os.environ.get(env_model) or DEFAULT_MODELS.get(proveedor) or DEFAULT_MODEL).strip()
+    modelo = (data.get("model") or _modelo_configurado(proveedor) or DEFAULT_MODELS.get(proveedor) or DEFAULT_MODEL).strip()
     if not key and proveedor not in {"llama_cpp", "mock"}:
         return jsonify({"error":f"No hay API key para {proveedor}. Escríbela en la configuración o define {env_key}."})
     if not caso:
@@ -1561,7 +1575,7 @@ def route_guardar():
     correccion = data.get("correccion","").strip()  # tu nota: qué cambiaste y por qué
     proveedor, env_key, env_model = _provider_env_names(
         data.get("provider") or os.environ.get("LLM_PROVIDER") or DEFAULT_PROVIDER or "openai")
-    modelo = (data.get("model") or os.environ.get(env_model) or DEFAULT_MODELS.get(proveedor) or DEFAULT_MODEL).strip()
+    modelo = (data.get("model") or _modelo_configurado(proveedor) or DEFAULT_MODELS.get(proveedor) or DEFAULT_MODEL).strip()
     explicacion = (data.get("explicacion") or "").strip()
     modalidad = (data.get("modalidad") or "").strip() or None
     validacion_humana = bool(data.get("validacion_humana", False))

@@ -27,6 +27,8 @@ if "%OPTIMUS_HOST%"=="" set OPTIMUS_HOST=127.0.0.1
 if "%OPTIMUS_PORT%"=="" set OPTIMUS_PORT=5000
 if "%OPENAI_MODEL%"=="" set OPENAI_MODEL=gpt-4.1-mini
 if "%DEEPSEEK_MODEL%"=="" set DEEPSEEK_MODEL=deepseek-chat
+rem Evita que una clave pegada por error en el campo de modelo se use como nombre de modelo.
+if /I "%DEEPSEEK_MODEL:~0,3%"=="sk-" set DEEPSEEK_MODEL=deepseek-chat
 echo OPTIMUS disponible en http://%OPTIMUS_HOST%:%OPTIMUS_PORT%
 echo Datos: %OPTIMUS_DATA_DIR%  Logs: %OPTIMUS_LOG_DIR%
 echo llama-server no se inicia automaticamente.
