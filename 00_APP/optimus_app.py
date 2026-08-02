@@ -911,10 +911,9 @@ def listar_modelos_disponibles(proveedor, api_key):
         from openai import OpenAI
         client = OpenAI(api_key=api_key)
         modelos = [m.id for m in client.models.list().data]
-        preferidos = ("gpt-5", "gpt-5-mini", "gpt-4.1", "gpt-4.1-mini", "gpt-4o-mini", "o4-mini", "o3-mini")
-        texto = sorted([m for m in modelos if m.startswith(("gpt-", "o"))])
-        texto = [m for m in preferidos if m in texto] + [m for m in texto if m not in preferidos]
-        return texto
+        # La lista pertenece al proyecto asociado a la clave: no filtramos por
+        # prefijos para que la interfaz refleje íntegramente lo que la API expone.
+        return sorted(modelos)
 
     if proveedor == "deepseek":
         from openai import OpenAI
