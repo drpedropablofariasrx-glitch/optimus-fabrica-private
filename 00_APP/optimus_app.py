@@ -70,6 +70,8 @@ VUEPACS_REVIEW_QUEUE = PROJECT_ROOT / "datasets" / "private" / "vuepacs_import" 
 SFT_REVIEW_QUEUES = (SFT_REVIEW_QUEUE, VUEPACS_REVIEW_QUEUE)
 SFT_REVIEW_STATUSES = {"pending", "candidate", "approved", "rejected"}
 SFT_REVIEW_PII = re.compile(r"(?i)\b(sip|nhc|historia|hospital|nombre|apellidos)\b")
+STYLE_REVIEW_QUEUE = PROJECT_ROOT / "datasets" / "private" / "optimus_style_v1" / "candidatos_estilo_por_revisar.jsonl"
+STYLE_REVIEW_STATUSES = {"candidate", "approved", "rejected"}
 
 
 def _registrar_evento_proveedor(nivel, codigo):
@@ -497,7 +499,7 @@ PAGINA = r"""<!doctype html><html lang="es"><head><meta charset="utf-8">
 @media(max-width:1150px){.app{grid-template-columns:280px minmax(0,1fr)}.composer{left:280px;right:0}.sidebar{box-shadow:6px 0 20px rgba(15,23,42,.08)}}
 </style></head><body>
 <div class="app">
-<aside class="sidebar"><div class="brand"><div class="logo">R</div><div><b>Fábrica Radiológica</b><span>informes · QA · chat de sistema</span></div></div><button class="new" onclick="nuevoCaso()">+ Nuevo caso</button><button class="sidebtn" style="margin:0 14px 8px" onclick="abrirImportar()">Importar del hospital</button><button class="sidebtn" style="margin:0 14px 8px" onclick="window.location.href='/sft_revision'">Revisar SFT</button><div class="side-title"><span>Casos</span><span id="count">—</span></div><div class="case-list" id="lista"><div class="empty">Sin casos guardados.</div></div><div class="side-foot"><label class="field">Región</label><select id="region" onchange="regionChanged()"><option value="abdomen">Abdomen</option><option value="lumbar">Columna lumbar</option><option value="cervical">Columna cervical</option><option value="rodilla">Rodilla</option></select><label class="field">Proveedor</label><select id="provider" onchange="providerChanged();saveConfig()"><option value="openai">OpenAI</option><option value="anthropic">Claude / Anthropic</option><option value="deepseek">DeepSeek</option></select><label class="field">Modelo</label><input id="model" list="model-presets" value="gpt-4.1-mini"><datalist id="model-presets"><option value="gpt-4.1-mini"><option value="gpt-4.1"><option value="gpt-4o-mini"><option value="gpt-5"><option value="gpt-5-mini"><option value="claude-sonnet-4-5"><option value="claude-opus-4-1"><option value="deepseek-chat"><option value="deepseek-reasoner"></datalist><button class="sidebtn" onclick="detectarModelos()">Detectar modelos disponibles</button><label class="field">API key</label><input type="password" id="key" placeholder="opcional si usas variable de entorno"><div class="tiny" id="providerHelp">OpenAI: usa OPENAI_API_KEY si no escribes clave aquí.</div></div></aside>
+<aside class="sidebar"><div class="brand"><div class="logo">R</div><div><b>Fábrica Radiológica</b><span>informes · QA · chat de sistema</span></div></div><button class="new" onclick="nuevoCaso()">+ Nuevo caso</button><button class="sidebtn" style="margin:0 14px 8px" onclick="abrirImportar()">Importar del hospital</button><button class="sidebtn" style="margin:0 14px 8px" onclick="window.location.href='/sft_revision'">Revisar SFT</button><button class="sidebtn" style="margin:0 14px 8px" onclick="window.location.href='/style_revision'">Revisar estilo</button><div class="side-title"><span>Casos</span><span id="count">—</span></div><div class="case-list" id="lista"><div class="empty">Sin casos guardados.</div></div><div class="side-foot"><label class="field">Región</label><select id="region" onchange="regionChanged()"><option value="abdomen">Abdomen</option><option value="lumbar">Columna lumbar</option><option value="cervical">Columna cervical</option><option value="rodilla">Rodilla</option></select><label class="field">Proveedor</label><select id="provider" onchange="providerChanged();saveConfig()"><option value="openai">OpenAI</option><option value="anthropic">Claude / Anthropic</option><option value="deepseek">DeepSeek</option></select><label class="field">Modelo</label><input id="model" list="model-presets" value="gpt-4.1-mini"><datalist id="model-presets"><option value="gpt-4.1-mini"><option value="gpt-4.1"><option value="gpt-4o-mini"><option value="gpt-5"><option value="gpt-5-mini"><option value="claude-sonnet-4-5"><option value="claude-opus-4-1"><option value="deepseek-chat"><option value="deepseek-reasoner"></datalist><button class="sidebtn" onclick="detectarModelos()">Detectar modelos disponibles</button><label class="field">API key</label><input type="password" id="key" placeholder="opcional si usas variable de entorno"><div class="tiny" id="providerHelp">OpenAI: usa OPENAI_API_KEY si no escribes clave aquí.</div></div></aside>
 <div class="divisor" id="divIzq" data-target="side"></div>
 <section class="main"><header class="top"><div><h1 id="regionTitle">TC abdomen y pelvis</h1><div class="meta" id="caseMeta">Nuevo caso · sin guardar</div></div><div class="actions"><button class="pill" onclick="revalidar()">Revalidar</button><button class="pill" onclick="copiarInforme()">Copiar</button><button class="pill primary" onclick="guardar()">Guardar</button></div></header><main class="chat" id="chat"><div class="thread" id="thread"><div class="welcome" id="welcome"><div class="biglogo">R</div><h2>¿Qué caso quieres informar?</h2><p>Pega el dictado abajo. A la derecha puedes pedirme cambios de formato, reglas o mejoras de la aplicación.</p><div class="cards"><div class="card"><b>Informe</b>Genera, edita, valida y guarda.</div><div class="card"><b>Chat de sistema</b>“Quita interpretación global”, “añade análisis global”, “no uses viñetas”.</div><div class="card"><b>Aprendizaje</b>Guarda correcciones y reglas candidatas.</div></div></div></div></main><div class="composer"><div class="box"><textarea id="caso" placeholder="Pega aquí el dictado bruto del caso…"></textarea><div class="row"><span class="status" id="estado"></span><button class="send" id="gen" onclick="generar()">↑</button></div></div></div></section>
 <div class="divisor" id="divDer" data-target="admin"></div>
@@ -672,6 +674,13 @@ async function save(status){const item=active();const payload={raw_input:el('raw
 el('region').addEventListener('change',()=>loadCases());el('modality').addEventListener('change',()=>loadCases());el('origen').addEventListener('change',()=>loadCases());el('state').addEventListener('change',()=>loadCases());(async()=>{const response=await fetch('/sft_revision/cases?region=all&modality=all&origen=all&status=all');const data=await response.json();const regions=data.regions||[];el('region').innerHTML='<option value="all">Todas las regiones</option>'+regions.map(region=>`<option value="${escapeHtml(region)}">${escapeHtml(region)}</option>`).join('');const modalities=data.modalities||[];el('modality').innerHTML='<option value="all">Todas las modalidades</option>'+modalities.map(modality=>`<option value="${escapeHtml(modality)}">${escapeHtml(modality)}</option>`).join('');await loadCases()})()
 </script></body></html>"""
 
+PAGINA_REVISION_ESTILO = r"""<!doctype html><html lang="es"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1"><title>OPTIMUS - Revisión de estilo</title>
+<style>:root{--bg:#f7f7f8;--panel:#fff;--ink:#111827;--muted:#6b7280;--line:#e5e7eb;--accent:#10a37f;--danger:#b42318}*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--ink);font:14px Inter,system-ui,sans-serif}.top{height:62px;background:var(--panel);border-bottom:1px solid var(--line);display:flex;align-items:center;justify-content:space-between;padding:0 24px}.top h1{margin:0;font-size:17px}.top span{display:block;color:var(--muted);font-size:12px;margin-top:3px}.back,.button{border:1px solid var(--line);background:#fff;border-radius:7px;padding:8px 11px;color:var(--ink);cursor:pointer;text-decoration:none;font-size:13px}.button.primary{background:var(--accent);border-color:var(--accent);color:#fff}.button.danger{color:var(--danger)}.layout{height:calc(100vh - 62px);padding:18px 22px;display:grid;grid-template-columns:260px minmax(0,1fr);gap:18px}.sidebar,.editor{background:var(--panel);border:1px solid var(--line);border-radius:8px;min-height:0}.sidebar{padding:16px}.field{display:block;font-weight:600;font-size:12px;margin:0 0 5px;color:var(--muted)}.filter,textarea{width:100%;border:1px solid var(--line);border-radius:6px;padding:10px;background:#fff;color:var(--ink)}.filter{margin:0 0 12px}.summary{font-size:12px;line-height:1.6;color:var(--muted)}.editor{padding:20px;display:grid;grid-template-rows:auto minmax(0,1fr) auto auto;gap:12px}.meta{border-bottom:1px solid var(--line);padding-bottom:12px}.meta b{font-size:15px}.source{font:12px ui-monospace,monospace;color:var(--muted);margin-top:4px}.report{min-height:0;display:flex;flex-direction:column}.report textarea{height:100%;resize:none;font:13px ui-monospace,monospace;line-height:1.45}.notes{height:72px;resize:vertical}.actions{display:flex;gap:8px;align-items:center}.status{margin-left:auto;color:var(--muted);font-size:12px}.empty{padding:36px;text-align:center;color:var(--muted)}@media(max-width:800px){.layout{height:auto;min-height:calc(100vh - 62px);grid-template-columns:1fr;padding:12px}.editor{min-height:620px}.top{padding:0 14px}}</style></head><body>
+<header class="top"><div><h1>Revisión de estilo</h1><span>Los ejemplos aprobados podrán servir como referencia de redacción; no cambian reglas clínicas.</span></div><a class="back" href="/">Volver a OPTIMUS</a></header>
+<main class="layout"><aside class="sidebar"><label class="field" for="region">Región</label><select class="filter" id="region"></select><label class="field" for="state">Estado</label><select class="filter" id="state"><option value="candidate">Por revisar</option><option value="approved">Aprobados para estilo</option><option value="rejected">Descartados</option><option value="all">Todos</option></select><div class="summary" id="summary"></div></aside><section class="editor" id="editor"><div class="empty">Cargando candidatos de estilo…</div></section></main>
+<script>const el=id=>document.getElementById(id);let cases=[],index=0;const esc=v=>String(v??'').replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('>','&gt;').replaceAll('"','&quot;');function active(){return cases[index]}async function loadCases(reset=true){const q=new URLSearchParams({region:el('region').value||'all',status:el('state').value||'candidate'});const r=await fetch('/style_revision/cases?'+q);const d=await r.json();if(!r.ok){el('editor').innerHTML='<div class="empty">'+esc(d.error||'No se pudo cargar la cola.')+'</div>';return}cases=d.cases||[];if(reset)index=0;const s=d.summary||{};el('summary').textContent=`${s.candidate||0} por revisar | ${s.approved||0} aprobados para estilo | ${s.rejected||0} descartados`;render()}function render(){const item=active();if(!item){el('editor').innerHTML='<div class="empty">No hay ejemplos para este filtro.</div>';return}const src=item.source||{},lines=Array.isArray(src.lines)?src.lines.join('-'):'';el('editor').innerHTML=`<div class="meta"><b>${esc(item.region)}</b><div class="source">${esc(src.file||'')}${lines?' (líneas '+esc(lines)+')':''} · ${index+1} de ${cases.length}</div></div><div class="report"><label class="field" for="report">Informe histórico</label><textarea id="report">${esc(item.report)}</textarea></div><div><label class="field" for="notes">Notas de revisión</label><textarea class="notes" id="notes">${esc(item.review_notes||'')}</textarea></div><div class="actions"><button class="button" onclick="move(-1)">Anterior</button><button class="button" onclick="move(1)">Siguiente</button><button class="button" onclick="save(active().approval_status)">Guardar</button><button class="button primary" onclick="save('approved')">Aprobar estilo</button><button class="button danger" onclick="save('rejected')">Descartar</button><span class="status" id="status"></span></div>`}function move(delta){const next=index+delta;if(next>=0&&next<cases.length){index=next;render()}}async function save(status){const item=active(),payload={report:el('report').value,review_notes:el('notes').value,approval_status:status};el('status').textContent='Guardando…';const r=await fetch('/style_revision/cases/'+encodeURIComponent(item.style_candidate_id),{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)}),d=await r.json();if(!r.ok){el('status').textContent=d.error||'No se pudo guardar';return}item.report=d.case.report;item.review_notes=d.case.review_notes;item.approval_status=d.case.approval_status;item.style_eligible=d.case.style_eligible;el('status').textContent=status==='approved'?'Aprobado para estilo':'Guardado';if(status!==el('state').value&&el('state').value!=='all')setTimeout(()=>loadCases(true),200)}el('region').addEventListener('change',()=>loadCases());el('state').addEventListener('change',()=>loadCases());(async()=>{const r=await fetch('/style_revision/cases?region=all&status=all'),d=await r.json();el('region').innerHTML='<option value="all">Todas las regiones</option>'+(d.regions||[]).map(x=>`<option value="${esc(x)}">${esc(x)}</option>`).join('');await loadCases()})()</script></body></html>"""
+
 @app.route("/")
 def home():
     return Response(PAGINA, mimetype="text/html")
@@ -795,6 +804,82 @@ def route_sft_revision_case_update(case_id):
     })
     _guardar_cola_revision_sft(queue_path, rows)
     return jsonify({"ok": True, "case": row, "summary": _resumen_cola_sft(_leer_cola_revision_sft())})
+
+
+def _leer_cola_estilo():
+    if not STYLE_REVIEW_QUEUE.exists():
+        return []
+    rows = []
+    for line in STYLE_REVIEW_QUEUE.read_text(encoding="utf-8").splitlines():
+        if not line.strip():
+            continue
+        try:
+            row = json.loads(line)
+        except json.JSONDecodeError:
+            continue
+        if row.get("style_candidate_id"):
+            rows.append(row)
+    return rows
+
+
+def _resumen_cola_estilo(rows):
+    summary = {status: 0 for status in STYLE_REVIEW_STATUSES}
+    for row in rows:
+        status = row.get("approval_status", "candidate")
+        if status in summary:
+            summary[status] += 1
+    return summary
+
+
+@app.route("/style_revision")
+def route_style_revision_page():
+    return Response(PAGINA_REVISION_ESTILO, mimetype="text/html")
+
+
+@app.route("/style_revision/cases")
+def route_style_revision_cases():
+    region = (request.args.get("region") or "all").strip()
+    status = (request.args.get("status") or "candidate").strip()
+    rows = _leer_cola_estilo()
+    filtered = [
+        row for row in rows
+        if (region == "all" or row.get("region") == region)
+        and (status == "all" or row.get("approval_status", "candidate") == status)
+    ]
+    return jsonify({
+        "cases": filtered,
+        "regions": sorted({row.get("region") for row in rows if row.get("region")}),
+        "summary": _resumen_cola_estilo(rows),
+    })
+
+
+@app.route("/style_revision/cases/<case_id>", methods=["PUT"])
+def route_style_revision_case_update(case_id):
+    data = request.get_json() or {}
+    status = (data.get("approval_status") or "candidate").strip().lower()
+    if status not in STYLE_REVIEW_STATUSES:
+        return jsonify({"error": "Estado de revisión no válido."}), 400
+    report = (data.get("report") or "").strip()
+    review_notes = (data.get("review_notes") or "").strip()
+    if status == "approved":
+        if not report:
+            return jsonify({"error": "Para aprobar se necesita un informe."}), 400
+        if SFT_REVIEW_PII.search(report):
+            return jsonify({"error": "El ejemplo contiene un posible identificador. Anonimízalo antes de aprobar."}), 400
+
+    rows = _leer_cola_estilo()
+    row = next((item for item in rows if item.get("style_candidate_id") == case_id), None)
+    if row is None:
+        return jsonify({"error": "Ejemplo de estilo no encontrado."}), 404
+    row.update({
+        "report": report,
+        "review_notes": review_notes,
+        "approval_status": status,
+        "style_eligible": status == "approved",
+        "reviewed_at": datetime.now().isoformat(timespec="seconds"),
+    })
+    _guardar_cola_revision_sft(STYLE_REVIEW_QUEUE, rows)
+    return jsonify({"ok": True, "case": row, "summary": _resumen_cola_estilo(rows)})
 
 
 @app.route("/regiones")
