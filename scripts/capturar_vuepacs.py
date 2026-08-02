@@ -147,6 +147,18 @@ class CaptureError(RuntimeError):
     pass
 
 
+class UnparseableReportError(CaptureError):
+    """El informe se abrio y se copio, pero su contenido no se reconoce.
+
+    A diferencia de otros CaptureError (fallo de automatizacion: no se
+    encontro la ventana, el puntero salio de Vue PACS, etc.), esto no
+    indica que algo este roto: puede ser un adendum, un informe
+    preliminar u otro formato sin las secciones esperadas. Se distingue
+    de la clase base para que la captura de varios casos pueda saltar
+    esta fila y seguir con la siguiente, en vez de detener toda la tanda.
+    """
+
+
 class StopRequested(RuntimeError):
     pass
 
@@ -226,7 +238,9 @@ def parse_report(text: str) -> dict:
     findings_matches = list(SECTION_FINDINGS.finditer(clean))
     impression_matches = list(SECTION_IMPRESSION.finditer(clean))
     if not data_matches or not findings_matches:
-        raise CaptureError("No se reconocieron Datos clinicos ni Hallazgos.")
+        raise UnparseableReportError(
+            "No se reconocieron Datos clinicos ni Hallazgos."
+        )
 
     data_match = data_matches[-1]
     findings_match = next(
@@ -1514,18 +1528,44 @@ def _open_report(
     )
 
 
+def _selected_row_rect(main_window):
+    """Rectangulo en pantalla de la fila resaltada en la lista de Vue PACS.
+
+    La tabla no expone el patron de Seleccion de UI Automation (se
+    comprobo: Table.get_selection() no tiene esa interfaz disponible en
+    esta plantilla), pero cada fila si expone su estado de accesibilidad
+    heredada (MSAA/IAccessible), donde STATE_SYSTEM_SELECTED (0x2) marca
+    la fila resaltada. Se usa solo esa posicion, nunca el contenido de la
+    fila. Devuelve (left, top, right, bottom) o None si no hay ninguna
+    resaltada ahora mismo.
+    """
+    STATE_SYSTEM_SELECTED = 0x2
+    for descendant in main_window.descendants():
+        if descendant.element_info.control_type not in ("Custom", "DataItem"):
+            continue
+        try:
+            state = descendant.legacy_properties().get("State")
+        except Exception:
+            continue
+        if isinstance(state, int) and state & STATE_SYSTEM_SELECTED:
+            rect = descendant.rectangle()
+            return (rect.left, rect.top, rect.right, rect.bottom)
+    return None
+
+
 def capture_reports(
     output: Path,
     title_pattern: str,
     max_cases: int,
     timeout: float,
-) -> tuple[int, int]:
+) -> tuple[int, int, int]:
     Desktop, keyboard, mouse, find_elements = _require_automation()
     desktop_uia = Desktop(backend="uia")
     desktop_win32 = Desktop(backend="win32")
     main_window = _find_main_window(desktop_uia, title_pattern)
     saved = 0
     duplicates = 0
+    skipped = 0
     print(
         f"Captura supervisada: máximo {max_cases} informes. "
         "Mantén F12 pulsado para detener."
@@ -1533,6 +1573,17 @@ def capture_reports(
     print("Selecciona la primera fila en Vue PACS. Inicio en 5 segundos...")
     time.sleep(5)
 
+    # Columna horizontal donde el usuario dejo el puntero sobre la
+    # primera fila. El clic derecho de esta plantilla de Vue PACS actua
+    # sobre la fila bajo el puntero, no sobre la fila resaltada por
+    # teclado (comprobado directamente), asi que al avanzar de fila se
+    # mueve el cursor en vertical manteniendo esta misma columna.
+    list_column_x = None
+    try:
+        (cursor_x, _cursor_y), _pid = _cursor_position_and_process_id()
+        list_column_x = cursor_x
+    except CaptureError:
+        list_column_x = None
 
     for case_index in range(max_cases):
         report_window = None
@@ -1633,7 +1684,7 @@ def capture_reports(
                     break
                 time.sleep(0.2)
             if not copied:
-                raise CaptureError("El informe no llegó al portapapeles.")
+                raise UnparseableReportError("El informe no llegó al portapapeles.")
             candidate = build_review_candidate(parse_report(copied))
             if append_candidate(output, candidate):
                 saved += 1
@@ -1641,6 +1692,15 @@ def capture_reports(
             else:
                 duplicates += 1
                 print("Duplicado omitido.")
+        except UnparseableReportError as error:
+            # A diferencia de un fallo de automatizacion (ventana no
+            # encontrada, puntero fuera de Vue PACS, etc.), esto solo
+            # significa que ESTA fila no tiene el formato esperado (p.ej.
+            # un adendum). No hay motivo para detener el resto de la
+            # tanda: se registra como omitida y se sigue con la fila
+            # siguiente.
+            skipped += 1
+            print(f"Fila omitida (no reconocida): {error}")
         finally:
             _clear_clipboard()
             if report_window is not None:
@@ -1663,7 +1723,21 @@ def capture_reports(
             _require_vue_focus(main_window)
             keyboard.send_keys("{DOWN}")
             time.sleep(0.5)
-    return saved, duplicates
+            # {DOWN} si mueve la fila resaltada (comprobado directamente),
+            # pero el clic derecho de esta plantilla de Vue PACS actua
+            # sobre la fila bajo el PUNTERO, no sobre la resaltada. Sin
+            # mover tambien el cursor, el siguiente clic derecho volveria
+            # a caer sobre la fila anterior y se recapturaria el mismo
+            # informe (se vio en la practica, detectado solo gracias a la
+            # deduplicacion por huella de contenido).
+            if list_column_x is not None:
+                row_rect = _selected_row_rect(main_window)
+                if row_rect is not None:
+                    _, row_top, _, row_bottom = row_rect
+                    row_y = (row_top + row_bottom) // 2
+                    mouse.move(coords=(list_column_x, row_y))
+                    time.sleep(0.2)
+    return saved, duplicates, skipped
 
 
 def probe(title_pattern: str) -> None:
@@ -1841,13 +1915,16 @@ def main() -> None:
         elif args.diagnose_clipboard:
             diagnose_clipboard()
         else:
-            saved, duplicates = capture_reports(
+            saved, duplicates, skipped = capture_reports(
                 args.output,
                 args.window_title_pattern,
                 args.max_cases,
                 args.timeout,
             )
-            print(f"Finalizado: {saved} guardados, {duplicates} duplicados.")
+            print(
+                f"Finalizado: {saved} guardados, {duplicates} duplicados, "
+                f"{skipped} omitidos (no reconocidos)."
+            )
     except StopRequested:
         print("Captura detenida con F12; los casos ya guardados permanecen intactos.")
     except CaptureError as error:

@@ -56,15 +56,38 @@ pantalla. No guarda ninguna captura de la pantalla.
 
 ## Prueba 3: captura supervisada
 
-La primera prueba visual está limitada a un solo informe. Selecciona la fila,
-deja el puntero encima de ella y ejecuta:
+Empieza con un solo informe. Selecciona la fila, deja el puntero encima de ella
+y ejecuta:
 
 ```powershell
 python scripts\capturar_vuepacs.py --capture --confirm-read-only --max-cases 1
 ```
 
-Mantén pulsado `F12` para detener el recorrido. El prototipo admite un máximo
-de un informe mientras se valida la apertura y el regreso seguro a la lista.
+Mantén pulsado `F12` para detener el recorrido. Tras comprobar el resultado en
+OPTIMUS, se pueden procesar tandas de hasta cinco informes:
+
+```powershell
+python scripts\capturar_vuepacs.py --capture --confirm-read-only --max-cases 5
+```
+
+Al pasar a la siguiente fila, el capturador mueve el puntero a la fila que ha
+quedado seleccionada. Esto evita que el menú contextual vuelva a abrir el
+informe anterior. Si un informe no tiene el formato esperado, se registra como
+omitido y la tanda continúa; un fallo de foco, ventana o seguridad sí detiene
+la captura.
+
+## Integración con Fábrica
+
+Cada candidato válido se añade, con `origen = vuepacs`, a la cola privada:
+
+```text
+datasets/private/vuepacs_import/pendientes_revision.jsonl
+```
+
+En Fábrica abre **Revisar SFT**, selecciona **Origen: VuePACS** y revisa cada
+candidato. Solo una aprobación manual puede incorporarlo al corpus de
+entrenamiento; la captura no modifica prompts, reglas, casos Gold ni el modelo.
+Los duplicados se detectan por una huella del contenido anonimizado.
 
 ## Controles de seguridad
 
