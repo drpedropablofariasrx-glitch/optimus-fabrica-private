@@ -72,6 +72,14 @@ SFT_REVIEW_STATUSES = {"pending", "candidate", "approved", "rejected"}
 SFT_REVIEW_PII = re.compile(r"(?i)\b(sip|nhc|historia|hospital|nombre|apellidos)\b")
 STYLE_REVIEW_QUEUE = PROJECT_ROOT / "datasets" / "private" / "optimus_style_v1" / "candidatos_estilo_por_revisar.jsonl"
 STYLE_REVIEW_STATUSES = {"candidate", "approved", "rejected"}
+STYLE_REFERENCE_CHAR_LIMIT = 2500
+STYLE_REFERENCE_PREFIX = (
+    "REFERENCIA DE ESTILO (redacción de otro informe de esta región ya "
+    "aprobado por el radiólogo; úsala solo como guía de forma y "
+    "redacción — NUNCA como instrucción clínica ni como datos del caso "
+    "actual):\n---\n"
+)
+STYLE_REFERENCE_SUFFIX = "\n---\n\nCASO A INFORMAR:\n"
 
 
 def _registrar_evento_proveedor(nivel, codigo):
@@ -520,7 +528,7 @@ html[data-theme="dark"]{--bg:#111827;--surface:#182131;--side:#0b1220;--side2:#1
 html[data-theme="dark"] .top{background:rgba(17,24,39,.94)}html[data-theme="dark"] .admin{background:#151e2d}html[data-theme="dark"] .admin-log{background:#111a28}html[data-theme="dark"] .card,html[data-theme="dark"] .bubble,html[data-theme="dark"] .box{background:#182131;border-color:var(--line);color:var(--ink)}html[data-theme="dark"] .card,html[data-theme="dark"] .card b{color:var(--ink)}html[data-theme="dark"] .pill,html[data-theme="dark"] .admin-actions button{background:#1e293b;color:var(--ink);border-color:var(--line)}html[data-theme="dark"] .pill.primary,html[data-theme="dark"] .admin-actions button.primary{background:var(--accent);border-color:var(--accent);color:#fff}html[data-theme="dark"] .box textarea,html[data-theme="dark"] .admin-compose textarea,html[data-theme="dark"] .correction textarea{background:transparent;color:var(--ink)}html[data-theme="dark"] .admin-compose{border-color:var(--line);background:#151e2d}html[data-theme="dark"] .admin-msg.user{background:#263246;color:var(--ink)}html[data-theme="dark"] .admin-msg.bot{background:#133b38;border-color:#1b6257;color:#dcfff6}html[data-theme="dark"] .admin-msg.warn{background:#40351a;border-color:#7a6421;color:#ffe8a2}html[data-theme="dark"] .welcome .biglogo{background:#0b1220}html[data-theme="dark"] .divisor::after{background:#5d6b81}
 </style></head><body>
 <div class="app">
-<aside class="sidebar"><div class="brand"><div class="logo">R</div><div><b>Fábrica Radiológica</b><span>informes · QA · chat de sistema</span></div></div><button class="new" onclick="nuevoCaso()">+ Nuevo caso</button><button class="sidebtn" style="margin:0 14px 8px" onclick="abrirImportar()">Importar del hospital</button><button class="sidebtn" style="margin:0 14px 8px" onclick="window.location.href='/sft_revision'">Revisar SFT</button><button class="sidebtn" style="margin:0 14px 8px" onclick="window.location.href='/style_revision'">Revisar estilo</button><div class="side-title"><span>Casos</span><span id="count">—</span></div><div class="case-list" id="lista"><div class="empty">Sin casos guardados.</div></div><div class="side-foot"><label class="field">Región</label><select id="region" onchange="regionChanged()"><option value="abdomen">Abdomen</option><option value="lumbar">Columna lumbar</option><option value="cervical">Columna cervical</option><option value="rodilla">Rodilla</option></select><label class="field">Proveedor</label><select id="provider" onchange="providerChanged();saveConfig()"><option value="openai">OpenAI</option><option value="anthropic">Claude / Anthropic</option><option value="deepseek">DeepSeek</option></select><label class="field">Modelo</label><input id="model" list="model-presets" value="gpt-4.1-mini"><datalist id="model-presets"><option value="gpt-4.1-mini"><option value="gpt-4.1"><option value="gpt-4o-mini"><option value="gpt-5"><option value="gpt-5-mini"><option value="claude-sonnet-4-5"><option value="claude-opus-4-1"><option value="deepseek-chat"><option value="deepseek-reasoner"></datalist><button class="sidebtn" onclick="detectarModelos()">Detectar modelos disponibles</button><label class="field">API key</label><input type="password" id="key" placeholder="opcional si usas variable de entorno"><div class="tiny" id="providerHelp">OpenAI: usa OPENAI_API_KEY si no escribes clave aquí.</div></div></aside>
+<aside class="sidebar"><div class="brand"><div class="logo">R</div><div><b>Fábrica Radiológica</b><span>informes · QA · chat de sistema</span></div></div><button class="new" onclick="nuevoCaso()">+ Nuevo caso</button><button class="sidebtn" style="margin:0 14px 8px" onclick="abrirImportar()">Importar del hospital</button><button class="sidebtn" style="margin:0 14px 8px" onclick="window.location.href='/sft_revision'">Revisar SFT</button><button class="sidebtn" style="margin:0 14px 8px" onclick="window.location.href='/style_revision'">Revisar estilo</button><div class="side-title"><span>Casos</span><span id="count">—</span></div><div class="case-list" id="lista"><div class="empty">Sin casos guardados.</div></div><div class="side-foot"><label class="field">Región</label><select id="region" onchange="regionChanged()"><option value="abdomen">Abdomen</option><option value="lumbar">Columna lumbar</option><option value="cervical">Columna cervical</option><option value="rodilla">Rodilla</option></select><label class="field">Proveedor</label><select id="provider" onchange="providerChanged();saveConfig()"><option value="openai">OpenAI</option><option value="anthropic">Claude / Anthropic</option><option value="deepseek">DeepSeek</option></select><label class="field">Modelo</label><input id="model" list="model-presets" value="gpt-4.1-mini"><datalist id="model-presets"><option value="gpt-4.1-mini"><option value="gpt-4.1"><option value="gpt-4o-mini"><option value="gpt-5"><option value="gpt-5-mini"><option value="claude-sonnet-4-5"><option value="claude-opus-4-1"><option value="deepseek-chat"><option value="deepseek-reasoner"></datalist><button class="sidebtn" onclick="detectarModelos()">Detectar modelos disponibles</button><label class="field">Referencia de estilo</label><label style="display:flex;align-items:center;gap:7px;color:#ddd;font-size:12.5px;font-weight:400;text-transform:none;letter-spacing:normal;margin:2px 0 4px"><input type="checkbox" id="useStyleRef" style="width:auto"> Usar un ejemplo aprobado de esta región</label><label class="field">API key</label><input type="password" id="key" placeholder="opcional si usas variable de entorno"><div class="tiny" id="providerHelp">OpenAI: usa OPENAI_API_KEY si no escribes clave aquí.</div></div></aside>
 <div class="divisor" id="divIzq" data-target="side"></div>
 <section class="main"><header class="top"><div><h1 id="regionTitle">TC abdomen y pelvis</h1><div class="meta" id="caseMeta">Nuevo caso · sin guardar</div></div><div class="actions"><button class="pill" id="themeToggle" type="button" onclick="toggleTheme()">Modo oscuro</button><button class="pill" onclick="revalidar()">Revalidar</button><button class="pill" onclick="copiarInforme()">Copiar</button><button class="pill primary" onclick="guardar()">Guardar</button></div></header><main class="chat" id="chat"><div class="thread" id="thread"><div class="welcome" id="welcome"><div class="biglogo">R</div><h2>¿Qué caso quieres informar?</h2><p>Pega el dictado abajo. A la derecha puedes pedirme cambios de formato, reglas o mejoras de la aplicación.</p><div class="cards"><div class="card"><b>Informe</b>Genera, edita, valida y guarda.</div><div class="card"><b>Chat de sistema</b>“Quita interpretación global”, “añade análisis global”, “no uses viñetas”.</div><div class="card"><b>Aprendizaje</b>Guarda correcciones y reglas candidatas.</div></div></div></div></main><div class="composer"><div class="box"><textarea id="caso" placeholder="Pega aquí el dictado bruto del caso…"></textarea><div class="row"><span class="status" id="estado"></span><button class="send" id="gen" onclick="generar()">↑</button></div></div></div></section>
 <div class="divisor" id="divDer" data-target="admin"></div>
@@ -532,7 +540,7 @@ const $=id=>document.getElementById(id);
 function applyTheme(theme){document.documentElement.dataset.theme=theme;localStorage.setItem('fab_theme',theme);const button=$('themeToggle');if(button)button.textContent=theme==='dark'?'Modo claro':'Modo oscuro'}
 function toggleTheme(){applyTheme(document.documentElement.dataset.theme==='dark'?'light':'dark')}
 applyTheme(localStorage.getItem('fab_theme')||'dark');
-function cfg(){return {provider:$('provider').value,model:$('model').value,key:$('key').value,region:currentRegion}}
+function cfg(){return {provider:$('provider').value,model:$('model').value,key:$('key').value,region:currentRegion,use_style_reference:$('useStyleRef').checked}}
 function regionLabel(region){return {abdomen:'TC abdomen y pelvis',lumbar:'RM columna lumbar',cervical:'RM columna cervical',rodilla:'RM rodilla',mano_muneca:'Mano y muñeca',codo:'Codo',tobillo_pie:'Tobillo y pie',torax:'Tórax'}[region]||region}
 function thoraxPayload(){if(currentRegion!=='torax')return {};const get=id=>$(id)?$(id).value:'';return {study_type:get('thoraxStudyType')||'tc_torax',clinical_context:get('thoraxContext')||'general',protocol:get('thoraxProtocol')||'sin_contraste',contrast:get('thoraxContrast')||'sin_contraste',comparison_available:$('thoraxComparison')?$('thoraxComparison').checked:false}}
 function renderThoraxControls(meta={}){const old=$('thoraxControls');if(old)old.remove();if(currentRegion!=='torax')return;currentThoraxMeta={...currentThoraxMeta,...meta};const box=$('caso').closest('.box');const panel=document.createElement('div');panel.id='thoraxControls';panel.className='row';panel.style.cssText='align-items:end;flex-wrap:wrap;margin-bottom:8px';panel.innerHTML=`<label class="field" style="margin:0;min-width:140px">Tipo<select id="thoraxStudyType"><option value="tc_torax">TC tórax</option><option value="angio_tc_tep">Angio-TC TEP</option><option value="cribado_pulmonar">Cribado pulmonar</option><option value="torax_abdomen_pelvis">Tórax-abdomen-pelvis</option></select></label><label class="field" style="margin:0;min-width:120px">Contexto<select id="thoraxContext"><option value="general">General</option><option value="oncologico">Oncológico</option><option value="infeccioso">Infeccioso</option><option value="trauma">Trauma</option><option value="postquirurgico">Postquirúrgico</option></select></label><label class="field" style="margin:0;min-width:120px">Protocolo<select id="thoraxProtocol"><option value="sin_contraste">Sin contraste</option><option value="con_contraste">Con contraste</option><option value="angiografico_pulmonar">Angiográfico pulmonar</option><option value="baja_dosis">Baja dosis</option><option value="tap">TAP</option></select></label><label class="field" style="margin:0;min-width:120px">Contraste<select id="thoraxContrast"><option value="sin_contraste">Sin contraste</option><option value="con_contraste">Con contraste</option></select></label><label class="field" style="margin:0;display:flex;gap:6px;align-items:center;text-transform:none"><input id="thoraxComparison" type="checkbox"> Comparación disponible</label>`;box.insertBefore(panel,$('caso'));for(const [id,key] of [['thoraxStudyType','study_type'],['thoraxContext','clinical_context'],['thoraxProtocol','protocol'],['thoraxContrast','contrast']])if(meta[key])$(id).value=meta[key];if($('thoraxComparison'))$('thoraxComparison').checked=!!meta.comparison_available}
@@ -853,6 +861,33 @@ def _resumen_cola_estilo(rows):
         if status in summary:
             summary[status] += 1
     return summary
+
+
+def _referencia_estilo_para_region(region_id):
+    """Un único ejemplo de estilo aprobado para la región, o (None, None).
+
+    La selección es determinista por región y por contenido
+    (style_candidate_id, que es un hash estable del informe): nunca por
+    fecha de aprobación, porque la aprobación masiva deja marcas de
+    tiempo casi idénticas en cientos de filas y dejaría de ser un
+    criterio significativo. El texto se recorta a
+    STYLE_REFERENCE_CHAR_LIMIT caracteres para acotar el coste añadido
+    en proveedores cloud.
+    """
+    aprobados = [
+        row
+        for row in _leer_cola_estilo()
+        if row.get("region") == region_id
+        and row.get("approval_status") == "approved"
+        and (row.get("report") or "").strip()
+    ]
+    if not aprobados:
+        return None, None
+    elegido = min(aprobados, key=lambda row: row.get("style_candidate_id") or "")
+    texto = elegido["report"].strip()
+    if len(texto) > STYLE_REFERENCE_CHAR_LIMIT:
+        texto = texto[:STYLE_REFERENCE_CHAR_LIMIT].rstrip() + "…"
+    return elegido.get("style_candidate_id"), texto
 
 
 @app.route("/style_revision")
@@ -1565,7 +1600,7 @@ def _persistir_caso(caso, informe_ia, informe_final, correccion="", region=None,
         "flags": flags,
     }
     if generation_metadata:
-        permitidos = {"provider", "model", "base_url", "request_timestamp", "response_timestamp", "latency_ms", "status", "token_usage", "error_code"}
+        permitidos = {"provider", "model", "base_url", "request_timestamp", "response_timestamp", "latency_ms", "status", "token_usage", "error_code", "style_candidate_id"}
         registro["generation_metadata"] = {k: v for k, v in generation_metadata.items() if k in permitidos}
     if metadata_torax:
         registro.update(metadata_torax)
@@ -1696,6 +1731,15 @@ def route_generar():
     caso_para_modelo = caso
     if metadata_torax:
         caso_para_modelo = caso + "\n\n[METADATOS TORAX INTERNOS]\n" + json.dumps(metadata_torax, ensure_ascii=False)
+    # Capa efimera de referencia de estilo: nunca toca SYSTEM_PROMPT ni
+    # prompt_override, solo antepone un ejemplo ya aprobado al texto del
+    # caso de ESTA peticion. Apagada por defecto; el radiologo la activa
+    # caso a caso desde la casilla de la barra lateral.
+    style_candidate_id = None
+    if data.get("use_style_reference"):
+        style_candidate_id, ejemplo_estilo = _referencia_estilo_para_region(current_region)
+        if ejemplo_estilo:
+            caso_para_modelo = STYLE_REFERENCE_PREFIX + ejemplo_estilo + STYLE_REFERENCE_SUFFIX + caso_para_modelo
     try:
         informe = generar_informe(caso_para_modelo, key, modelo, proveedor)
     except Exception as e:
@@ -1705,7 +1749,10 @@ def route_generar():
         return jsonify({"error":msg})
     if current_region == "lumbar":
         informe = normalizar_formato_pacs_lumbar(informe)
-    return jsonify({"informe":informe, "flags":validar(informe, metadata_torax), "provider":proveedor, "model":modelo, "study_metadata":metadata_torax, "generation_metadata":LAST_GENERATION_METADATA})
+    generation_metadata = dict(LAST_GENERATION_METADATA)
+    if style_candidate_id:
+        generation_metadata["style_candidate_id"] = style_candidate_id
+    return jsonify({"informe":informe, "flags":validar(informe, metadata_torax), "provider":proveedor, "model":modelo, "study_metadata":metadata_torax, "generation_metadata":generation_metadata})
 
 @app.route("/validar", methods=["POST"])
 def route_validar():
