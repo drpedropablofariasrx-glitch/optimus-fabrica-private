@@ -882,6 +882,41 @@ def route_style_revision_case_update(case_id):
     return jsonify({"ok": True, "case": row, "summary": _resumen_cola_estilo(rows)})
 
 
+@app.route("/style_revision/approve_all", methods=["POST"])
+def route_style_revision_approve_all():
+    """Aprueba en bloque solo candidatos de estilo completos y sin alertas PII."""
+    rows = _leer_cola_estilo()
+    approved = 0
+    skipped_empty = 0
+    skipped_pii = 0
+    now = datetime.now().isoformat(timespec="seconds")
+    for row in rows:
+        if row.get("approval_status", "candidate") != "candidate":
+            continue
+        report = (row.get("report") or "").strip()
+        if not report:
+            skipped_empty += 1
+            continue
+        if SFT_REVIEW_PII.search(report):
+            skipped_pii += 1
+            continue
+        row.update({
+            "approval_status": "approved",
+            "style_eligible": True,
+            "reviewed_at": now,
+            "review_notes": (row.get("review_notes") or "").strip() or "Aprobación masiva solicitada por el radiólogo.",
+        })
+        approved += 1
+    _guardar_cola_revision_sft(STYLE_REVIEW_QUEUE, rows)
+    return jsonify({
+        "ok": True,
+        "approved": approved,
+        "skipped_empty": skipped_empty,
+        "skipped_possible_pii": skipped_pii,
+        "summary": _resumen_cola_estilo(rows),
+    })
+
+
 @app.route("/regiones")
 def route_regiones():
     regiones = []
