@@ -112,6 +112,21 @@ class StyleReferenceSelectionTests(unittest.TestCase):
 
         self.assertEqual(texto, texto_corto)
 
+    def test_multiple_references_keep_legacy_example_and_are_bounded(self):
+        rows = [
+            _style_row("style_zzz", region="abdomen", report="Z" * 2300),
+            _style_row("style_aaa", region="abdomen", report="A" * 200),
+            _style_row("style_mmm", region="abdomen", report="M" * 900),
+        ]
+        _write_jsonl(self.mod.STYLE_REVIEW_QUEUE, rows)
+
+        candidate_ids, texto = self.mod._referencias_estilo_para_region("abdomen")
+
+        self.assertEqual(candidate_ids[0], "style_aaa")
+        self.assertLessEqual(len(candidate_ids), self.mod.STYLE_REFERENCE_MAX_EXAMPLES)
+        self.assertLessEqual(len(texto), self.mod.STYLE_REFERENCE_TOTAL_CHAR_LIMIT)
+        self.assertIn("EJEMPLO DE REDACCI", texto)
+
 
 class StyleReferenceGenerationTests(unittest.TestCase):
     """Pruebas de integracion sobre /generar (proveedor mock, sin red)."""
@@ -153,6 +168,7 @@ class StyleReferenceGenerationTests(unittest.TestCase):
 
         self.assertNotIn("error", data)
         self.assertEqual(data["generation_metadata"]["style_candidate_id"], "style_aaa")
+        self.assertEqual(data["generation_metadata"]["style_candidate_ids"][0], "style_aaa")
 
     def test_style_reference_enabled_without_approved_examples_is_silent(self):
         _write_jsonl(self.mod.STYLE_REVIEW_QUEUE, [])
@@ -257,6 +273,32 @@ class StyleReferencePersistenceTests(unittest.TestCase):
 
         self.assertEqual(
             registro["generation_metadata"]["style_candidate_id"], "style_aaa"
+        )
+
+    def test_style_candidate_ids_survive_persistence_allowlist(self):
+        response = self.client.post(
+            "/guardar",
+            json={
+                "caso": "Dictado bruto de prueba.",
+                "informe_ia": "Informe generado.",
+                "informe_final": "Informe generado.",
+                "provider": "mock",
+                "model": "mock-radiology",
+                "generation_metadata": {
+                    "provider": "mock",
+                    "model": "mock-radiology",
+                    "status": "success",
+                    "style_candidate_ids": ["style_aaa", "style_bbb"],
+                },
+            },
+        )
+        data = response.get_json()
+        archivo = self.mod.CASOS_DIR / f"{data['archivo']}.json"
+        registro = json.loads(archivo.read_text(encoding="utf-8"))
+
+        self.assertEqual(
+            registro["generation_metadata"]["style_candidate_ids"],
+            ["style_aaa", "style_bbb"],
         )
 
     def test_no_style_candidate_id_when_reference_was_not_used(self):

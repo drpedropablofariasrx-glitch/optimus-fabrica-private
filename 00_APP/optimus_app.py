@@ -73,6 +73,12 @@ SFT_REVIEW_PII = re.compile(r"(?i)\b(sip|nhc|historia|hospital|nombre|apellidos)
 STYLE_REVIEW_QUEUE = PROJECT_ROOT / "datasets" / "private" / "optimus_style_v1" / "candidatos_estilo_por_revisar.jsonl"
 STYLE_REVIEW_STATUSES = {"candidate", "approved", "rejected"}
 STYLE_REFERENCE_CHAR_LIMIT = 2500
+# Dos ejemplos dan una referencia más representativa sin convertir el
+# contexto clínico en un volcado del corpus. El límite total protege tanto
+# la latencia local como el coste al usar un proveedor cloud.
+STYLE_REFERENCE_MAX_EXAMPLES = 2
+STYLE_REFERENCE_TOTAL_CHAR_LIMIT = 3600
+STYLE_REFERENCE_PER_EXAMPLE_CHAR_LIMIT = 1800
 STYLE_REFERENCE_PREFIX = (
     "REFERENCIA DE ESTILO (redacción de otro informe de esta región ya "
     "aprobado por el radiólogo; úsala solo como guía de forma y "
@@ -594,7 +600,9 @@ function guardarModelosProveedor(proveedor,modelos){localStorage.setItem(claveMo
 function sincronizarSelectorRapidoModelo(){const input=$('model'),quick=$('quickModel');if(!input||!quick)return;let modelos=modelosDisponiblesProveedor();const actual=input.value.trim();if(actual&&modelos.includes(actual)===false&&modelos.length===0)modelos=[actual];if(!modelos.length)modelos=[MODELOS_BASE_POR_PROVEEDOR[$('provider')?.value]||['']].flat().filter(Boolean);const elegido=modelos.includes(actual)?actual:(modelos[0]||'');input.value=elegido;quick.replaceChildren(...modelos.map(modelo=>new Option(modelo,modelo)));quick.value=elegido}
 function cambiarModeloRapido(){const quick=$('quickModel'),input=$('model');if(!quick||!input)return;input.value=quick.value;saveConfig();$('estado').textContent='Modelo seleccionado: '+quick.value}
 function asegurarSelectorRapidoModelo(){const actions=document.querySelector('.composer-actions');if(!actions)return;let quick=$('quickModel');if(!quick){const label=document.createElement('label');label.className='quick-model';label.title='Modelo que se usará para generar el informe';label.append('Modelo ');quick=document.createElement('select');quick.id='quickModel';quick.addEventListener('change',cambiarModeloRapido);label.appendChild(quick);actions.parentElement.insertBefore(label,actions)}sincronizarSelectorRapidoModelo()}
+function inicializarPreferenciaEstilo(){const control=$('useStyleRef');if(!control)return;const preferencia=localStorage.getItem('fab_use_style_reference');control.checked=preferencia!=='off';control.addEventListener('change',()=>localStorage.setItem('fab_use_style_reference',control.checked?'on':'off'))}
 setAdminPanel(localStorage.getItem('fab_admin_panel')==='open');
+inicializarPreferenciaEstilo();
 function cfg(){return {provider:$('provider').value,model:$('model').value,key:$('key').value,region:currentRegion,use_style_reference:$('useStyleRef').checked}}
 function regionLabel(region){return {abdomen:'TC abdomen y pelvis',lumbar:'RM columna lumbar',cervical:'RM columna cervical',rodilla:'RM rodilla',mano_muneca:'Mano y muñeca',codo:'Codo',tobillo_pie:'Tobillo y pie',torax:'Tórax'}[region]||region}
 function thoraxPayload(){if(currentRegion!=='torax')return {};const get=id=>$(id)?$(id).value:'';return {study_type:get('thoraxStudyType')||'tc_torax',clinical_context:get('thoraxContext')||'general',protocol:get('thoraxProtocol')||'sin_contraste',contrast:get('thoraxContrast')||'sin_contraste',comparison_available:$('thoraxComparison')?$('thoraxComparison').checked:false}}
@@ -956,6 +964,57 @@ def _referencia_estilo_para_region(region_id):
     if len(texto) > STYLE_REFERENCE_CHAR_LIMIT:
         texto = texto[:STYLE_REFERENCE_CHAR_LIMIT].rstrip() + "…"
     return elegido.get("style_candidate_id"), texto
+
+
+def _referencias_estilo_para_region(region_id):
+    """Devuelve hasta dos referencias aprobadas, estables y acotadas.
+
+    La primera se conserva igual que la selección histórica para mantener
+    trazabilidad. La segunda se elige por longitud próxima a la mediana de
+    los informes aprobados: evita usar como patrón un informe excepcionalmente
+    corto o largo. Solo aporta forma de redacción; nunca contenido clínico.
+    """
+    aprobados = [
+        row for row in _leer_cola_estilo()
+        if row.get("region") == region_id
+        and row.get("approval_status") == "approved"
+        and isinstance(row.get("report"), str)
+        and row["report"].strip()
+    ]
+    if not aprobados:
+        return [], ""
+
+    principal_id, _principal_texto = _referencia_estilo_para_region(region_id)
+    principal = next(
+        (row for row in aprobados if row.get("style_candidate_id") == principal_id),
+        None,
+    )
+    longitudes = sorted(len(row["report"].strip()) for row in aprobados)
+    mediana = longitudes[len(longitudes) // 2]
+    restantes = sorted(
+        (row for row in aprobados if row is not principal),
+        key=lambda row: (
+            abs(len(row["report"].strip()) - mediana),
+            row.get("style_candidate_id") or "",
+        ),
+    )
+    elegidos = ([principal] if principal else []) + restantes
+    elegidos = elegidos[:STYLE_REFERENCE_MAX_EXAMPLES]
+
+    usados, bloques, restantes_caracteres = [], [], STYLE_REFERENCE_TOTAL_CHAR_LIMIT
+    for indice, row in enumerate(elegidos, start=1):
+        cabecera = f"EJEMPLO DE REDACCIÓN {indice}:\n"
+        espacio = restantes_caracteres - len(cabecera)
+        if espacio <= 0:
+            break
+        limite = min(STYLE_REFERENCE_PER_EXAMPLE_CHAR_LIMIT, espacio)
+        texto = row["report"].strip()
+        if len(texto) > limite:
+            texto = texto[:max(limite - 1, 0)].rstrip() + "…"
+        bloques.append(cabecera + texto)
+        usados.append(row.get("style_candidate_id"))
+        restantes_caracteres -= len(cabecera) + len(texto)
+    return usados, "\n\n".join(bloques)
 
 
 @app.route("/style_revision")
@@ -1668,7 +1727,7 @@ def _persistir_caso(caso, informe_ia, informe_final, correccion="", region=None,
         "flags": flags,
     }
     if generation_metadata:
-        permitidos = {"provider", "model", "base_url", "request_timestamp", "response_timestamp", "latency_ms", "status", "token_usage", "error_code", "style_candidate_id"}
+        permitidos = {"provider", "model", "base_url", "request_timestamp", "response_timestamp", "latency_ms", "status", "token_usage", "error_code", "style_candidate_id", "style_candidate_ids"}
         registro["generation_metadata"] = {k: v for k, v in generation_metadata.items() if k in permitidos}
     if metadata_torax:
         registro.update(metadata_torax)
@@ -1800,14 +1859,16 @@ def route_generar():
     if metadata_torax:
         caso_para_modelo = caso + "\n\n[METADATOS TORAX INTERNOS]\n" + json.dumps(metadata_torax, ensure_ascii=False)
     # Capa efimera de referencia de estilo: nunca toca SYSTEM_PROMPT ni
-    # prompt_override, solo antepone un ejemplo ya aprobado al texto del
-    # caso de ESTA peticion. Apagada por defecto; el radiologo la activa
-    # caso a caso desde la casilla de la barra lateral.
+    # prompt_override, solo antepone referencias ya aprobadas al texto del
+    # caso de ESTA petición. La preferencia visual se controla en la UI;
+    # la API sigue requiriendo el flag explícito para ser reproducible.
     style_candidate_id = None
+    style_candidate_ids = []
     if data.get("use_style_reference"):
-        style_candidate_id, ejemplo_estilo = _referencia_estilo_para_region(current_region)
-        if ejemplo_estilo:
-            caso_para_modelo = STYLE_REFERENCE_PREFIX + ejemplo_estilo + STYLE_REFERENCE_SUFFIX + caso_para_modelo
+        style_candidate_id, _ejemplo_legacy = _referencia_estilo_para_region(current_region)
+        style_candidate_ids, ejemplos_estilo = _referencias_estilo_para_region(current_region)
+        if ejemplos_estilo:
+            caso_para_modelo = STYLE_REFERENCE_PREFIX + ejemplos_estilo + STYLE_REFERENCE_SUFFIX + caso_para_modelo
     try:
         informe = generar_informe(caso_para_modelo, key, modelo, proveedor)
     except Exception as e:
@@ -1832,6 +1893,8 @@ def route_generar():
     generation_metadata = dict(LAST_GENERATION_METADATA)
     if style_candidate_id:
         generation_metadata["style_candidate_id"] = style_candidate_id
+    if style_candidate_ids:
+        generation_metadata["style_candidate_ids"] = style_candidate_ids
     return jsonify({"informe":informe, "flags":validar(informe, metadata_torax), "provider":proveedor, "model":modelo, "study_metadata":metadata_torax, "generation_metadata":generation_metadata})
 
 @app.route("/validar", methods=["POST"])
