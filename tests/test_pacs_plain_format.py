@@ -84,6 +84,13 @@ class PacsPlainFormatTests(unittest.TestCase):
         self.assertIn('class="sidebar-scrim"', page)
         self.assertIn("function toggleSidebar()", page)
 
+    def test_composer_has_a_quick_model_selector_synced_with_configuration(self):
+        page = self.mod.PAGINA
+
+        self.assertIn("quick.id='quickModel'", page)
+        self.assertIn("function cambiarModeloRapido()", page)
+        self.assertIn("function sincronizarSelectorRapidoModelo()", page)
+
 
 if __name__ == "__main__":
     unittest.main()
