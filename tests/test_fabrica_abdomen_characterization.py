@@ -290,6 +290,21 @@ class FabricaAbdomenCharacterizationTests(unittest.TestCase):
         self.assertEqual(response.status_code, 502)
         self.assertIn("ningún informe vacío", response.get_json()["error"])
 
+    def test_generar_rechaza_respuesta_que_queda_vacia_al_normalizar(self):
+        with patch.object(self.mod, "generar_informe", return_value="  \r\n\t"):
+            response = self.client.post(
+                "/generar",
+                json={
+                    "caso": "dolor abdominal",
+                    "key": "test-key",
+                    "provider": "openai",
+                    "model": "modelo-falso",
+                },
+            )
+
+        self.assertEqual(response.status_code, 502)
+        self.assertIn("ningún informe vacío", response.get_json()["error"])
+
     def test_generar_informe_anthropic_usa_mock_sin_llamada_externa(self):
         fake_client = MagicMock()
         fake_response = MagicMock()

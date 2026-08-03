@@ -53,6 +53,7 @@ class PacsPlainFormatTests(unittest.TestCase):
         self.assertIn("Informe listo para PACS", page)
         self.assertIn("⧉ Copiar", page)
         self.assertIn("function textoInforme()", page)
+        self.assertIn("!String(d.informe||'').trim()", page)
 
     def test_style_rules_are_available_from_a_collapsed_advanced_panel(self):
         page = self.mod.PAGINA
