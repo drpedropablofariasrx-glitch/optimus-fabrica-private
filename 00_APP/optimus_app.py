@@ -419,7 +419,32 @@ def _openai_compat_chat(client, modelo, system, user):
             resp = client.chat.completions.create(model=modelo, messages=mensajes)
         else:
             raise
-    return resp.choices[0].message.content
+    content = getattr(resp.choices[0].message, "content", None)
+    if isinstance(content, str) and content.strip():
+        return content.strip()
+    # Algunos modelos recientes pueden completar la petición legacy pero no
+    # entregar texto en message.content. En ese caso usamos Responses API,
+    # que expone el resultado de texto como output_text.
+    responses = getattr(client, "responses", None)
+    if responses and hasattr(responses, "create"):
+        try:
+            response = responses.create(
+                model=modelo,
+                instructions=system,
+                input=user,
+                temperature=0.2,
+            )
+        except Exception as exc:
+            if "temperature" not in str(exc).lower():
+                raise RuntimeError("El modelo no devolvió texto en Chat Completions.") from exc
+            response = responses.create(model=modelo, instructions=system, input=user)
+        output_text = getattr(response, "output_text", "") or ""
+        if str(output_text).strip():
+            return str(output_text).strip()
+    raise RuntimeError(
+        "El modelo respondió correctamente, pero no devolvió texto de informe. "
+        "Prueba otro modelo o revisa su compatibilidad con la API."
+    )
 
 
 def _texto_anthropic(resp):
@@ -1774,6 +1799,11 @@ def route_generar():
         if "model_not_found" in msg or "does not have access to model" in msg:
             msg += "\n\nEse proyecto/API key no tiene acceso al modelo elegido. Pulsa 'Detectar modelos disponibles' y selecciona uno de la lista."
         return jsonify({"error":msg})
+    if not str(informe or "").strip():
+        return jsonify({
+            "error": "El modelo terminó sin devolver texto de informe. No se ha creado ni guardado ningún informe vacío.",
+            "generation_metadata": {"provider": proveedor, "model": modelo, "status": "empty_response"},
+        }), 502
     informe = normalizar_formato_pacs(
         informe,
         eliminar_analisis_calidad=current_region == "cervical",

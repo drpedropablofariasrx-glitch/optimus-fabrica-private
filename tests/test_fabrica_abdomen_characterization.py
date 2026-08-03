@@ -255,6 +255,41 @@ class FabricaAbdomenCharacterizationTests(unittest.TestCase):
             fake_client, "deepseek-chat", self.mod.SYSTEM_PROMPT, "caso bruto"
         )
 
+    def test_openai_uses_responses_api_when_chat_completion_has_no_text(self):
+        fake_client = MagicMock()
+        chat_response = MagicMock()
+        chat_response.choices = [MagicMock()]
+        chat_response.choices[0].message.content = None
+        fake_client.chat.completions.create.return_value = chat_response
+        fake_client.responses.create.return_value.output_text = "Informe recuperado por Responses API."
+
+        result = self.mod._openai_compat_chat(
+            fake_client, "gpt-5.6-luna", "instrucciones", "caso de prueba"
+        )
+
+        self.assertEqual(result, "Informe recuperado por Responses API.")
+        fake_client.responses.create.assert_called_once_with(
+            model="gpt-5.6-luna",
+            instructions="instrucciones",
+            input="caso de prueba",
+            temperature=0.2,
+        )
+
+    def test_generar_rechaza_un_informe_vacio_antes_de_mostrarlo(self):
+        with patch.object(self.mod, "generar_informe", return_value=""):
+            response = self.client.post(
+                "/generar",
+                json={
+                    "caso": "dolor abdominal",
+                    "key": "test-key",
+                    "provider": "openai",
+                    "model": "modelo-falso",
+                },
+            )
+
+        self.assertEqual(response.status_code, 502)
+        self.assertIn("ningún informe vacío", response.get_json()["error"])
+
     def test_generar_informe_anthropic_usa_mock_sin_llamada_externa(self):
         fake_client = MagicMock()
         fake_response = MagicMock()
