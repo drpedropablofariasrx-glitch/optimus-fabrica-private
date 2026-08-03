@@ -76,6 +76,14 @@ class PacsPlainFormatTests(unittest.TestCase):
         self.assertIn("Informe pegado", page)
         self.assertIn("validacion_local", page)
 
+    def test_narrow_layout_uses_a_collapsible_configuration_sidebar(self):
+        page = self.mod.PAGINA
+
+        self.assertIn("@media(max-width:980px)", page)
+        self.assertIn('id="sidebarToggle"', page)
+        self.assertIn('class="sidebar-scrim"', page)
+        self.assertIn("function toggleSidebar()", page)
+
 
 if __name__ == "__main__":
     unittest.main()
