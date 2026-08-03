@@ -65,6 +65,16 @@ class PacsPlainFormatTests(unittest.TestCase):
         self.assertIn("Enviar propuesta", page)
         self.assertIn("Aplicar cambio", page)
 
+    def test_main_page_detects_region_from_pasted_text_and_can_analyze_a_report(self):
+        page = self.mod.PAGINA
+
+        self.assertIn("function detectarRegionPegada()", page)
+        self.assertIn("function programarDeteccionRegion()", page)
+        self.assertIn("function analizarInformePegado()", page)
+        self.assertIn('id="analyze"', page)
+        self.assertIn("Informe pegado", page)
+        self.assertIn("validacion_local", page)
+
 
 if __name__ == "__main__":
     unittest.main()
