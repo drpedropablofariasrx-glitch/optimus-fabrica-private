@@ -86,6 +86,22 @@ STYLE_REFERENCE_PREFIX = (
     "actual):\n---\n"
 )
 STYLE_REFERENCE_SUFFIX = "\n---\n\nCASO A INFORMAR:\n"
+# Igual que la referencia de estilo, pero para conocimiento clinico general
+# en vez de redaccion: recupera localmente fragmentos de la biblioteca
+# relevantes para ESTE dictado (busqueda 100% local) y solo el texto de
+# esos fragmentos -nunca el PDF ni el indice completo- se envia al
+# proveedor elegido junto con el caso.
+BIBLIOGRAFIA_MAX_CHUNKS = 3
+BIBLIOGRAFIA_TOTAL_CHAR_LIMIT = 3600
+BIBLIOGRAFIA_PER_CHUNK_CHAR_LIMIT = 1400
+BIBLIOGRAFIA_PREFIX = (
+    "REFERENCIA BIBLIOGRÁFICA (fragmentos de tu biblioteca local "
+    "relevantes para este caso; apóyate en ellos solo para terminología "
+    "y conocimiento clínico general — NUNCA los uses como fuente de "
+    "hallazgos de este paciente ni inventes datos que no estén en el "
+    "dictado):\n---\n"
+)
+BIBLIOGRAFIA_SUFFIX = "\n---\n\n"
 
 
 def _registrar_evento_proveedor(nivel, codigo):
@@ -576,7 +592,7 @@ html[data-theme="dark"]{--bg:#111827;--surface:#182131;--side:#0b1220;--side2:#1
 html[data-theme="dark"] .top{background:rgba(17,24,39,.94)}html[data-theme="dark"] .admin{background:#151e2d}html[data-theme="dark"] .admin-log{background:#111a28}html[data-theme="dark"] .card,html[data-theme="dark"] .bubble,html[data-theme="dark"] .box{background:#182131;border-color:var(--line);color:var(--ink)}html[data-theme="dark"] .card,html[data-theme="dark"] .card b{color:var(--ink)}html[data-theme="dark"] .pill,html[data-theme="dark"] .admin-actions button,html[data-theme="dark"] .report-tool,html[data-theme="dark"] .analyze-btn{background:#1e293b;color:var(--ink);border-color:var(--line)}html[data-theme="dark"] .pill.primary,html[data-theme="dark"] .admin-actions button.primary{background:var(--accent);border-color:var(--accent);color:#fff}html[data-theme="dark"] .box textarea,html[data-theme="dark"] .admin-compose textarea,html[data-theme="dark"] .correction textarea,html[data-theme="dark"] .report-editor{background:transparent;color:var(--ink)}html[data-theme="dark"] .report-toolbar{background:#151e2d}html[data-theme="dark"] .admin-compose{border-color:var(--line);background:#151e2d}html[data-theme="dark"] .admin-msg.user{background:#263246;color:var(--ink)}html[data-theme="dark"] .admin-msg.bot{background:#133b38;border-color:#1b6257;color:#dcfff6}html[data-theme="dark"] .admin-msg.warn{background:#40351a;border-color:#7a6421;color:#ffe8a2}html[data-theme="dark"] .welcome .biglogo{background:#0b1220}html[data-theme="dark"] .divisor::after{background:#5d6b81}
 </style></head><body>
 <div class="app" id="appShell">
-<aside class="sidebar"><div class="brand"><div class="logo">R</div><div><b>Fábrica Radiológica</b><span>informes · QA · chat de sistema</span></div></div><button class="new" onclick="nuevoCaso()">+ Nuevo caso</button><button class="sidebtn" style="margin:0 14px 8px" onclick="abrirImportar()">Importar del hospital</button><button class="sidebtn" style="margin:0 14px 8px" onclick="window.location.href='/sft_revision'">Revisar SFT</button><button class="sidebtn" style="margin:0 14px 8px" onclick="window.location.href='/style_revision'">Revisar estilo</button><div class="side-title"><span>Casos</span><span id="count">—</span></div><div class="case-list" id="lista"><div class="empty">Sin casos guardados.</div></div><div class="side-foot"><label class="field">Región activa</label><select id="region" onchange="regionChanged()"><option value="abdomen">Abdomen</option><option value="lumbar">Columna lumbar</option><option value="cervical">Columna cervical</option><option value="rodilla">Rodilla</option></select><div class="tiny" id="regionDetectionHelp">Se detecta automáticamente al pegar; usa este selector solo para corregir una ambigüedad.</div><label class="field">Proveedor</label><select id="provider" onchange="providerChanged();saveConfig()"><option value="openai">OpenAI</option><option value="anthropic">Claude / Anthropic</option><option value="deepseek">DeepSeek</option></select><label class="field">Modelo</label><input id="model" list="model-presets" value="gpt-4.1-mini"><datalist id="model-presets"><option value="gpt-4.1-mini"><option value="gpt-4.1"><option value="gpt-4o-mini"><option value="gpt-5"><option value="gpt-5-mini"><option value="claude-sonnet-4-5"><option value="claude-opus-4-1"><option value="deepseek-chat"><option value="deepseek-reasoner"></datalist><button class="sidebtn" onclick="detectarModelos()">Detectar modelos disponibles</button><label class="field">Referencia de estilo</label><label style="display:flex;align-items:center;gap:7px;color:#ddd;font-size:12.5px;font-weight:400;text-transform:none;letter-spacing:normal;margin:2px 0 4px"><input type="checkbox" id="useStyleRef" style="width:auto"> Usar un ejemplo aprobado de esta región</label><label class="field">API key</label><input type="password" id="key" placeholder="opcional si usas variable de entorno"><div class="tiny" id="providerHelp">OpenAI: usa OPENAI_API_KEY si no escribes clave aquí.</div></div></aside>
+<aside class="sidebar"><div class="brand"><div class="logo">R</div><div><b>Fábrica Radiológica</b><span>informes · QA · chat de sistema</span></div></div><button class="new" onclick="nuevoCaso()">+ Nuevo caso</button><button class="sidebtn" style="margin:0 14px 8px" onclick="abrirImportar()">Importar del hospital</button><button class="sidebtn" style="margin:0 14px 8px" onclick="window.location.href='/sft_revision'">Revisar SFT</button><button class="sidebtn" style="margin:0 14px 8px" onclick="window.location.href='/style_revision'">Revisar estilo</button><button class="sidebtn" style="margin:0 14px 8px" onclick="window.location.href='/biblioteca'">Biblioteca</button><div class="side-title"><span>Casos</span><span id="count">—</span></div><div class="case-list" id="lista"><div class="empty">Sin casos guardados.</div></div><div class="side-foot"><label class="field">Región activa</label><select id="region" onchange="regionChanged()"><option value="abdomen">Abdomen</option><option value="lumbar">Columna lumbar</option><option value="cervical">Columna cervical</option><option value="rodilla">Rodilla</option></select><div class="tiny" id="regionDetectionHelp">Se detecta automáticamente al pegar; usa este selector solo para corregir una ambigüedad.</div><label class="field">Proveedor</label><select id="provider" onchange="providerChanged();saveConfig()"><option value="openai">OpenAI</option><option value="anthropic">Claude / Anthropic</option><option value="deepseek">DeepSeek</option></select><label class="field">Modelo</label><input id="model" list="model-presets" value="gpt-4.1-mini"><datalist id="model-presets"><option value="gpt-4.1-mini"><option value="gpt-4.1"><option value="gpt-4o-mini"><option value="gpt-5"><option value="gpt-5-mini"><option value="claude-sonnet-4-5"><option value="claude-opus-4-1"><option value="deepseek-chat"><option value="deepseek-reasoner"></datalist><button class="sidebtn" onclick="detectarModelos()">Detectar modelos disponibles</button><label class="field">Referencia de estilo</label><label style="display:flex;align-items:center;gap:7px;color:#ddd;font-size:12.5px;font-weight:400;text-transform:none;letter-spacing:normal;margin:2px 0 4px"><input type="checkbox" id="useStyleRef" style="width:auto"> Usar un ejemplo aprobado de esta región</label><label class="field">Biblioteca</label><label style="display:flex;align-items:center;gap:7px;color:#ddd;font-size:12.5px;font-weight:400;text-transform:none;letter-spacing:normal;margin:2px 0 4px"><input type="checkbox" id="useBiblioteca" style="width:auto"> Usar bibliografía local relevante para este caso</label><label class="field">API key</label><input type="password" id="key" placeholder="opcional si usas variable de entorno"><div class="tiny" id="providerHelp">OpenAI: usa OPENAI_API_KEY si no escribes clave aquí.</div></div></aside>
 <div class="sidebar-scrim" onclick="toggleSidebar()"></div><div class="divisor" id="divIzq" data-target="side"></div>
 <section class="main"><header class="top"><div><h1 id="regionTitle">TC abdomen y pelvis</h1><div class="meta" id="caseMeta">Nuevo caso · sin guardar</div></div><div class="actions"><button class="pill sidebar-toggle" id="sidebarToggle" type="button" onclick="toggleSidebar()" aria-expanded="false">☰ Configuración</button><button class="pill advanced-toggle" id="advancedToggle" type="button" onclick="toggleAdminPanel()" aria-expanded="false">⚙ Estilo y reglas</button><button class="pill" id="themeToggle" type="button" onclick="toggleTheme()">Modo oscuro</button><button class="pill" onclick="revalidar()">Revalidar</button><button class="pill" onclick="copiarInforme()">Copiar</button><button class="pill primary" onclick="guardar()">Guardar</button></div></header><main class="chat" id="chat"><div class="thread" id="thread"><div class="welcome" id="welcome"><div class="biglogo">R</div><h2>¿Qué quieres revisar?</h2><p>Pega un dictado para generar un informe o un informe ya redactado para analizarlo. La región se detecta sola.</p><div class="cards"><div class="card"><b>Generar</b>Dictado → informe editable.</div><div class="card"><b>Analizar</b>Informe pegado → región y control de calidad.</div><div class="card"><b>Estilo y reglas</b>Cambia el formato en lenguaje natural desde ⚙, con vista previa antes de aplicarlo.</div></div></div></div></main><div class="composer"><div class="box"><textarea id="caso" placeholder="Pega un dictado o un informe completo; detectaré la región automáticamente…"></textarea><div class="row"><span class="status" id="estado"></span><div class="composer-actions"><button class="analyze-btn" id="analyze" type="button" onclick="analizarInformePegado()">Analizar informe</button><button class="send" id="gen" title="Generar informe" onclick="generar()">↑</button></div></div></div></div></section>
 <div class="divisor" id="divDer" data-target="admin"></div>
@@ -601,9 +617,11 @@ function sincronizarSelectorRapidoModelo(){const input=$('model'),quick=$('quick
 function cambiarModeloRapido(){const quick=$('quickModel'),input=$('model');if(!quick||!input)return;input.value=quick.value;saveConfig();$('estado').textContent='Modelo seleccionado: '+quick.value}
 function asegurarSelectorRapidoModelo(){const actions=document.querySelector('.composer-actions');if(!actions)return;let quick=$('quickModel');if(!quick){const label=document.createElement('label');label.className='quick-model';label.title='Modelo que se usará para generar el informe';label.append('Modelo ');quick=document.createElement('select');quick.id='quickModel';quick.addEventListener('change',cambiarModeloRapido);label.appendChild(quick);actions.parentElement.insertBefore(label,actions)}sincronizarSelectorRapidoModelo()}
 function inicializarPreferenciaEstilo(){const control=$('useStyleRef');if(!control)return;const preferencia=localStorage.getItem('fab_use_style_reference');control.checked=preferencia!=='off';control.addEventListener('change',()=>localStorage.setItem('fab_use_style_reference',control.checked?'on':'off'))}
+function inicializarPreferenciaBiblioteca(){const control=$('useBiblioteca');if(!control)return;const preferencia=localStorage.getItem('fab_use_bibliografia');control.checked=preferencia!=='off';control.addEventListener('change',()=>localStorage.setItem('fab_use_bibliografia',control.checked?'on':'off'))}
 setAdminPanel(localStorage.getItem('fab_admin_panel')==='open');
 inicializarPreferenciaEstilo();
-function cfg(){return {provider:$('provider').value,model:$('model').value,key:$('key').value,region:currentRegion,use_style_reference:$('useStyleRef').checked}}
+inicializarPreferenciaBiblioteca();
+function cfg(){return {provider:$('provider').value,model:$('model').value,key:$('key').value,region:currentRegion,use_style_reference:$('useStyleRef').checked,use_bibliografia:$('useBiblioteca').checked}}
 function regionLabel(region){return {abdomen:'TC abdomen y pelvis',lumbar:'RM columna lumbar',cervical:'RM columna cervical',rodilla:'RM rodilla',mano_muneca:'Mano y muñeca',codo:'Codo',tobillo_pie:'Tobillo y pie',torax:'Tórax'}[region]||region}
 function thoraxPayload(){if(currentRegion!=='torax')return {};const get=id=>$(id)?$(id).value:'';return {study_type:get('thoraxStudyType')||'tc_torax',clinical_context:get('thoraxContext')||'general',protocol:get('thoraxProtocol')||'sin_contraste',contrast:get('thoraxContrast')||'sin_contraste',comparison_available:$('thoraxComparison')?$('thoraxComparison').checked:false}}
 function renderThoraxControls(meta={}){const old=$('thoraxControls');if(old)old.remove();if(currentRegion!=='torax')return;currentThoraxMeta={...currentThoraxMeta,...meta};const box=$('caso').closest('.box');const panel=document.createElement('div');panel.id='thoraxControls';panel.className='row';panel.style.cssText='align-items:end;flex-wrap:wrap;margin-bottom:8px';panel.innerHTML=`<label class="field" style="margin:0;min-width:140px">Tipo<select id="thoraxStudyType"><option value="tc_torax">TC tórax</option><option value="angio_tc_tep">Angio-TC TEP</option><option value="cribado_pulmonar">Cribado pulmonar</option><option value="torax_abdomen_pelvis">Tórax-abdomen-pelvis</option></select></label><label class="field" style="margin:0;min-width:120px">Contexto<select id="thoraxContext"><option value="general">General</option><option value="oncologico">Oncológico</option><option value="infeccioso">Infeccioso</option><option value="trauma">Trauma</option><option value="postquirurgico">Postquirúrgico</option></select></label><label class="field" style="margin:0;min-width:120px">Protocolo<select id="thoraxProtocol"><option value="sin_contraste">Sin contraste</option><option value="con_contraste">Con contraste</option><option value="angiografico_pulmonar">Angiográfico pulmonar</option><option value="baja_dosis">Baja dosis</option><option value="tap">TAP</option></select></label><label class="field" style="margin:0;min-width:120px">Contraste<select id="thoraxContrast"><option value="sin_contraste">Sin contraste</option><option value="con_contraste">Con contraste</option></select></label><label class="field" style="margin:0;display:flex;gap:6px;align-items:center;text-transform:none"><input id="thoraxComparison" type="checkbox"> Comparación disponible</label>`;box.insertBefore(panel,$('caso'));for(const [id,key] of [['thoraxStudyType','study_type'],['thoraxContext','clinical_context'],['thoraxProtocol','protocol'],['thoraxContrast','contrast']])if(meta[key])$(id).value=meta[key];if($('thoraxComparison'))$('thoraxComparison').checked=!!meta.comparison_available}
@@ -1017,6 +1035,53 @@ def _referencias_estilo_para_region(region_id):
     return usados, "\n\n".join(bloques)
 
 
+def _referencia_bibliografia_para_caso(caso, region_id):
+    """Fragmentos de la biblioteca local relevantes para ESTE dictado.
+
+    Busqueda 100% local (rag_biblioteca.buscar_bibliografia, indice
+    propio en datasets/private/): nunca sale del equipo. Solo el TEXTO de
+    los fragmentos recuperados -nunca el PDF ni el indice completo- se
+    antepone al caso antes de enviarlo al proveedor elegido. Si la
+    dependencia opcional no esta instalada o no hay indice construido
+    para esta region, no rompe la generacion: se omite en silencio,
+    igual que la referencia de estilo cuando no hay ejemplos aprobados.
+    """
+    try:
+        import rag_biblioteca
+    except ImportError:
+        return [], ""
+    try:
+        resultados = rag_biblioteca.buscar_bibliografia(
+            caso, region=region_id, top_k=BIBLIOGRAFIA_MAX_CHUNKS
+        )
+    except SystemExit:
+        return [], ""
+    except Exception:
+        _registrar_evento_proveedor("WARNING", "biblioteca_busqueda_fallo")
+        return [], ""
+    if not resultados:
+        return [], ""
+
+    usados, bloques, restantes = [], [], BIBLIOGRAFIA_TOTAL_CHAR_LIMIT
+    for fila in resultados:
+        texto = (fila.get("contenido") or "").strip()
+        if not texto or restantes <= 0:
+            continue
+        cita = f"[{fila.get('documento_fuente', '')}, pág. {fila.get('pagina_inicio', '?')}]\n"
+        espacio = restantes - len(cita)
+        if espacio <= 0:
+            break
+        limite = min(BIBLIOGRAFIA_PER_CHUNK_CHAR_LIMIT, espacio)
+        if len(texto) > limite:
+            texto = texto[:max(limite - 1, 0)].rstrip() + "…"
+        bloques.append(cita + texto)
+        usados.append(fila.get("chunk_id"))
+        restantes -= len(cita) + len(texto)
+    if not bloques:
+        return [], ""
+    return usados, "\n\n".join(bloques)
+
+
 @app.route("/style_revision")
 def route_style_revision_page():
     return Response(PAGINA_REVISION_ESTILO, mimetype="text/html")
@@ -1101,6 +1166,58 @@ def route_style_revision_approve_all():
         "skipped_possible_pii": skipped_pii,
         "summary": _resumen_cola_estilo(rows),
     })
+
+
+PAGINA_BIBLIOTECA = r"""<!doctype html><html lang="es"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1"><title>OPTIMUS - Biblioteca</title>
+<style>:root{--bg:#f7f7f8;--panel:#fff;--ink:#111827;--muted:#6b7280;--line:#e5e7eb;--accent:#10a37f}*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--ink);font:14px Inter,system-ui,sans-serif}.top{height:62px;background:var(--panel);border-bottom:1px solid var(--line);display:flex;align-items:center;justify-content:space-between;padding:0 24px}.top h1{margin:0;font-size:17px}.top span{display:block;color:var(--muted);font-size:12px;margin-top:3px}.back{border:1px solid var(--line);background:#fff;border-radius:7px;padding:8px 11px;color:var(--ink);cursor:pointer;text-decoration:none;font-size:13px}.layout{max-width:900px;margin:0 auto;padding:24px}.buscador{display:flex;gap:8px;margin-bottom:8px}.buscador input,.buscador select{border:1px solid var(--line);border-radius:8px;padding:10px 12px;font-size:14px}.buscador input{flex:1}.buscador button{border:1px solid var(--accent);background:var(--accent);color:#fff;border-radius:8px;padding:10px 16px;cursor:pointer;font-size:14px}.aviso{color:var(--muted);font-size:12px;margin-bottom:18px}.resultado{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:14px 16px;margin-bottom:10px}.resultado .meta{font:12px ui-monospace,monospace;color:var(--muted);margin-bottom:6px;display:flex;justify-content:space-between}.resultado .contenido{white-space:pre-wrap;font-size:13.5px;line-height:1.5;max-height:180px;overflow:auto}.empty{color:var(--muted);text-align:center;padding:40px}</style></head><body>
+<header class="top"><div><h1>Biblioteca (consulta manual)</h1><span>Búsqueda local sobre bibliografía aprobada; nunca se envía a ningún proveedor cloud.</span></div><a class="back" href="/">Volver a OPTIMUS</a></header>
+<main class="layout"><div class="buscador"><input id="q" placeholder="Ej.: tipos de rotura meniscal" onkeydown="if(event.key==='Enter')buscar()"><select id="region"><option value="">Todas las regiones</option></select><button onclick="buscar()">Buscar</button></div><div class="aviso" id="aviso"></div><div id="resultados"></div></main>
+<script>const el=id=>document.getElementById(id);const esc=v=>String(v??'').replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('>','&gt;');
+async function cargarRegiones(){try{const r=await fetch('/biblioteca/regiones');const d=await r.json();el('region').innerHTML='<option value="">Todas las regiones</option>'+(d.regiones||[]).map(x=>`<option value="${esc(x)}">${esc(x)}</option>`).join('')}catch(e){}}
+async function buscar(){const q=el('q').value.trim();if(!q)return;el('resultados').innerHTML='<div class="empty">Buscando…</div>';el('aviso').textContent='';const params=new URLSearchParams({q,region:el('region').value||''});const r=await fetch('/biblioteca/buscar?'+params);const d=await r.json();if(!r.ok){el('resultados').innerHTML='';el('aviso').textContent=d.error||'Error en la búsqueda.';return}if(!d.resultados||!d.resultados.length){el('resultados').innerHTML='<div class="empty">Sin resultados. ¿Hay algún índice construido para esta región?</div>';return}el('resultados').innerHTML=d.resultados.map(x=>`<div class="resultado"><div class="meta"><span>${esc(x.documento_fuente)} · pág. ${esc(x.pagina_inicio)}${x.pagina_fin!==x.pagina_inicio?'-'+esc(x.pagina_fin):''} · ${esc(x.tipo)}</span><span>score ${x.score.toFixed(3)}</span></div><div class="contenido">${esc(x.contenido)}</div></div>`).join('')}
+cargarRegiones();
+</script></body></html>"""
+
+
+@app.route("/biblioteca")
+def route_biblioteca_page():
+    return Response(PAGINA_BIBLIOTECA, mimetype="text/html")
+
+
+@app.route("/biblioteca/regiones")
+def route_biblioteca_regiones():
+    try:
+        import rag_biblioteca
+        _embeddings, metadatos = rag_biblioteca._cargar_indice()
+    except SystemExit:
+        return jsonify({"regiones": []})
+    regiones = sorted({fila.get("region") for fila in metadatos if fila.get("region")})
+    return jsonify({"regiones": regiones})
+
+
+@app.route("/biblioteca/buscar")
+def route_biblioteca_buscar():
+    """Busqueda manual sobre la biblioteca local. Solo lectura: no genera
+    informes, no toca prompts ni reglas clinicas, no envia nada a ningun
+    proveedor cloud. Requiere que ya se haya construido el indice local
+    (rag_biblioteca.construir_indice()) para al menos una region."""
+    query = (request.args.get("q") or "").strip()
+    region = (request.args.get("region") or "").strip() or None
+    if not query:
+        return jsonify({"error": "Escribe una consulta."}), 400
+    try:
+        import rag_biblioteca
+    except ImportError:
+        return jsonify({
+            "error": "Falta la dependencia opcional de la biblioteca. Instala con: "
+                     "python -m pip install -r requirements-biblioteca.txt"
+        }), 503
+    try:
+        resultados = rag_biblioteca.buscar_bibliografia(query, region=region, top_k=8)
+    except SystemExit as error:
+        return jsonify({"error": str(error)}), 503
+    return jsonify({"resultados": resultados})
 
 
 @app.route("/regiones")
@@ -1727,7 +1844,7 @@ def _persistir_caso(caso, informe_ia, informe_final, correccion="", region=None,
         "flags": flags,
     }
     if generation_metadata:
-        permitidos = {"provider", "model", "base_url", "request_timestamp", "response_timestamp", "latency_ms", "status", "token_usage", "error_code", "style_candidate_id", "style_candidate_ids"}
+        permitidos = {"provider", "model", "base_url", "request_timestamp", "response_timestamp", "latency_ms", "status", "token_usage", "error_code", "style_candidate_id", "style_candidate_ids", "bibliografia_chunk_ids"}
         registro["generation_metadata"] = {k: v for k, v in generation_metadata.items() if k in permitidos}
     if metadata_torax:
         registro.update(metadata_torax)
@@ -1869,6 +1986,16 @@ def route_generar():
         style_candidate_ids, ejemplos_estilo = _referencias_estilo_para_region(current_region)
         if ejemplos_estilo:
             caso_para_modelo = STYLE_REFERENCE_PREFIX + ejemplos_estilo + STYLE_REFERENCE_SUFFIX + caso_para_modelo
+    # Capa efimera de referencia bibliografica: misma logica que la de
+    # estilo, pero buscada localmente a partir del propio dictado (no
+    # requiere que el radiologo escriba ninguna consulta). Se antepone
+    # POR FUERA del bloque de estilo para que "CASO A INFORMAR:" siga
+    # inmediatamente antes del dictado real.
+    bibliografia_chunk_ids = []
+    if data.get("use_bibliografia"):
+        bibliografia_chunk_ids, bloque_biblio = _referencia_bibliografia_para_caso(caso, current_region)
+        if bloque_biblio:
+            caso_para_modelo = BIBLIOGRAFIA_PREFIX + bloque_biblio + BIBLIOGRAFIA_SUFFIX + caso_para_modelo
     try:
         informe = generar_informe(caso_para_modelo, key, modelo, proveedor)
     except Exception as e:
@@ -1895,6 +2022,8 @@ def route_generar():
         generation_metadata["style_candidate_id"] = style_candidate_id
     if style_candidate_ids:
         generation_metadata["style_candidate_ids"] = style_candidate_ids
+    if bibliografia_chunk_ids:
+        generation_metadata["bibliografia_chunk_ids"] = bibliografia_chunk_ids
     return jsonify({"informe":informe, "flags":validar(informe, metadata_torax), "provider":proveedor, "model":modelo, "study_metadata":metadata_torax, "generation_metadata":generation_metadata})
 
 @app.route("/validar", methods=["POST"])
