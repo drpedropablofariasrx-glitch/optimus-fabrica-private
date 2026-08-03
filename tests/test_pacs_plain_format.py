@@ -1,0 +1,59 @@
+import unittest
+
+from test_fabrica_abdomen_characterization import load_app_copy
+
+
+class PacsPlainFormatTests(unittest.TestCase):
+    def setUp(self):
+        self.tmpdir, self.mod = load_app_copy()
+
+    def tearDown(self):
+        self.tmpdir.cleanup()
+
+    def test_normalizer_removes_markdown_bullets_and_numbered_headers(self):
+        raw = (
+            "1. **Datos clínicos:**\nCervicalgia.\n\n"
+            "3. **Hallazgos:**\n- **C5-C6:** protrusión.\n\n"
+            "4. **Impresión diagnóstica:**\n- Estenosis foraminal."
+        )
+
+        report = self.mod.normalizar_formato_pacs(raw)
+
+        self.assertEqual(
+            report,
+            "Datos clínicos:\nCervicalgia.\n\n"
+            "Hallazgos:\nC5-C6: protrusión.\n\n"
+            "Impresión diagnóstica:\nEstenosis foraminal.",
+        )
+
+    def test_cervical_normalizer_removes_quality_section(self):
+        raw = (
+            "Hallazgos:\nC5-C6: protrusión.\n\n"
+            "Análisis de calidad / oportunidades de mejora:\n"
+            "Comentario interno que no debe llegar al PACS."
+        )
+
+        report = self.mod.normalizar_formato_pacs(raw, eliminar_analisis_calidad=True)
+
+        self.assertEqual(report, "Hallazgos:\nC5-C6: protrusión.")
+
+    def test_cervical_prompt_requires_plain_pacs_output(self):
+        prompt = self.mod.load_region_prompt("cervical").lower()
+
+        self.assertIn("texto plano", prompt)
+        self.assertIn("no uses markdown", prompt)
+        self.assertIn("nunca se muestra como", prompt)
+        self.assertNotIn("5. análisis de calidad", prompt)
+
+    def test_main_page_uses_an_editable_plain_text_report_card(self):
+        page = self.mod.PAGINA
+
+        self.assertIn('class="report-card"', page)
+        self.assertIn('id="informe" class="report-editor"', page)
+        self.assertIn("Informe listo para PACS", page)
+        self.assertIn("⧉ Copiar", page)
+        self.assertIn("function textoInforme()", page)
+
+
+if __name__ == "__main__":
+    unittest.main()
