@@ -54,6 +54,7 @@ class LocalTrainingCorpusTests(unittest.TestCase):
         self.assertTrue(manifest["safety"]["train_and_benchmark_disjoint"])
         self.assertIn("rodilla|RM", manifest["style_profiles"]["profiles_by_region_modality"])
         self.assertEqual(train[0]["messages"][2]["role"], "assistant")
+        self.assertEqual(train[0]["candidate_type"], "unknown")
 
     def test_keeps_small_regions_out_of_benchmark(self):
         with tempfile.TemporaryDirectory() as directory:

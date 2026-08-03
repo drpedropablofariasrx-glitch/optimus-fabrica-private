@@ -181,6 +181,7 @@ def pares_aprobados(queues: Iterable[Path]) -> tuple[list[dict], Counter]:
                     "modality": modalidad(row),
                     "source": row.get("source") if isinstance(row.get("source"), dict) else {},
                     "source_queue": queue.name,
+                    "candidate_type": str(row.get("candidate_type") or "unknown"),
                     "messages": [
                         {"role": "system", "content": SYSTEM_MESSAGE},
                         {"role": "user", "content": raw},
