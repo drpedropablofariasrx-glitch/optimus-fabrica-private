@@ -32,3 +32,9 @@ aprobados, los perfiles de estilo, el conjunto SFT y un banco de evaluación
 separado bajo `datasets/private/optimus_training_v1/`. No modifica Fábrica ni
 entrena un modelo. Consulte `99_docs/CORPUS_LOCAL_QWEN.md` antes de iniciar un
 fine-tuning de Qwen.
+
+## Handoff para asistentes de código
+
+`CLAUDE.md` obliga a empezar por `99_docs/HANDOFF_CLAUDE.md`: un único estado
+operativo compacto que debe sustituirse tras cada cambio verificado. Con ello,
+Claude puede orientarse sin volver a leer el repositorio ni los datos privados.
