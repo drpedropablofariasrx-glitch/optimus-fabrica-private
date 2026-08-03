@@ -71,14 +71,9 @@ Push-Location tests; ..\.venv\Scripts\python.exe -m unittest discover -p "test_*
 
 ## Próximos pasos ordenados
 
-1. Ampliar la bibliografía RAG a más regiones (hoy solo rodilla/tobillo_pie).
-2. Recuperar y aprobar más pares de VuePACS con dictado real; priorizar RM de
-   rodilla, lumbar, hombro y cervical.
-3. Mejorar clasificación región/modalidad sin inventar valores desconocidos.
-4. Evaluar el modelo base sobre los 114 casos de benchmark antes de entrenar.
-5. Congelar corpus/versionar manifiesto y hacer fine-tuning solo con train.
-6. Repetir el benchmark: estilo, lateralidad, negaciones, omisiones, formato
-   PACS y tiempo de corrección humana.
+El orden, criterios de aceptación y rutas propuestas están en
+`99_docs/BACKLOG_EJECUTABLE_OPTIMUS.md`. Empezar por P0: runner de benchmark
+base, antes de instalar ASR o entrenar Qwen.
 
 ## Versiones recientes ya en Git
 

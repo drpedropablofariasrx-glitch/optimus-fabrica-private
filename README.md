@@ -38,3 +38,5 @@ fine-tuning de Qwen.
 `CLAUDE.md` obliga a empezar por `99_docs/HANDOFF_CLAUDE.md`: un único estado
 operativo compacto que debe sustituirse tras cada cambio verificado. Con ello,
 Claude puede orientarse sin volver a leer el repositorio ni los datos privados.
+Las tareas técnicas activas y sus criterios de aceptación están en
+`99_docs/BACKLOG_EJECUTABLE_OPTIMUS.md`.
