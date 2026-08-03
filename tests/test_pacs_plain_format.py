@@ -54,6 +54,17 @@ class PacsPlainFormatTests(unittest.TestCase):
         self.assertIn("⧉ Copiar", page)
         self.assertIn("function textoInforme()", page)
 
+    def test_style_rules_are_available_from_a_collapsed_advanced_panel(self):
+        page = self.mod.PAGINA
+
+        self.assertIn('id="advancedToggle"', page)
+        self.assertIn("Estilo y reglas", page)
+        self.assertIn('id="adminText"', page)
+        self.assertIn("function toggleAdminPanel()", page)
+        self.assertIn("function setAdminPanel(open)", page)
+        self.assertIn("Enviar propuesta", page)
+        self.assertIn("Aplicar cambio", page)
+
 
 if __name__ == "__main__":
     unittest.main()
