@@ -24,3 +24,11 @@ El soporte `llama_cpp` es opcional y usa un llama-server externo por HTTP. No se
 - `REPARAR_OPTIMUS_IA.bat` y `DESINSTALAR_OPTIMUS_IA.bat`: recuperan o retiran el runtime sin tocar OPTIMUS ni datos clinicos.
 
 Consulte `99_docs/INSTALACION_AUTOMATICA_IA.md` y `99_docs/SEGURIDAD_DESCARGAS.md`. Las pruebas automatizadas no realizan descargas reales, y MedGemma no esta integrado.
+
+## Corpus para el futuro modelo local
+
+`scripts/preparar_corpus_entrenamiento_local.py` crea, solo a partir de pares
+aprobados, los perfiles de estilo, el conjunto SFT y un banco de evaluación
+separado bajo `datasets/private/optimus_training_v1/`. No modifica Fábrica ni
+entrena un modelo. Consulte `99_docs/CORPUS_LOCAL_QWEN.md` antes de iniciar un
+fine-tuning de Qwen.
