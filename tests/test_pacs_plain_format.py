@@ -90,6 +90,8 @@ class PacsPlainFormatTests(unittest.TestCase):
         self.assertIn("quick.id='quickModel'", page)
         self.assertIn("function cambiarModeloRapido()", page)
         self.assertIn("function sincronizarSelectorRapidoModelo()", page)
+        self.assertIn("MODELOS_BASE_POR_PROVEEDOR", page)
+        self.assertIn("modelosDisponiblesProveedor()", page)
 
 
 if __name__ == "__main__":
