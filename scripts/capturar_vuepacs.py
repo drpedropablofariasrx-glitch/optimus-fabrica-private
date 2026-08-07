@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import argparse
 import base64
+import contextlib
 import ctypes
 from ctypes import wintypes
 import hashlib
@@ -46,6 +47,11 @@ SELECT_ALL_MENU_NAME = "Seleccionar todo"
 COPY_MENU_NAME = "Copiar"
 STOP_KEY = 0x7B  # F12
 VISUAL_MATCH_THRESHOLD = 0.90
+# Si esta cantidad de filas seguidas fallan al abrir o copiar, se detiene
+# la tanda aunque cada fallo individual sea "saltable": una racha asi es
+# senal de que algo se rompio de verdad (Vue PACS se cerro, perdio el
+# foco, cambio de pantalla...), no de filas puntuales con formato raro.
+CONSECUTIVE_SKIP_LIMIT = 5
 REPORT_MENU_TEMPLATE_PATHS = (
     ROOT / "scripts" / "assets" / "vuepacs_ver_informes.png",
     ROOT / "scripts" / "assets" / "vuepacs_ver_informes_text.png",
@@ -450,6 +456,33 @@ def _ensure_dpi_awareness() -> None:
         ctypes.windll.user32.SetProcessDPIAware()
     except (AttributeError, OSError):
         pass
+
+
+_ES_CONTINUOUS = 0x80000000
+_ES_SYSTEM_REQUIRED = 0x00000001
+_ES_DISPLAY_REQUIRED = 0x00000002
+
+
+@contextlib.contextmanager
+def _keep_system_awake():
+    """Impide que el equipo suspenda o apague la pantalla mientras dura.
+
+    Usa SetThreadExecutionState, la misma llamada Win32 que usan un
+    reproductor de video o un gestor de descargas para evitar que el
+    sistema se suspenda a media tarea. No es un cambio de configuracion
+    del sistema: es un estado por proceso que Windows revierte solo al
+    salir de este bloque (normal o por excepcion), o si el proceso
+    termina de cualquier forma. No evita un bloqueo manual de sesion
+    (Win+L) ni un reinicio forzado por Windows Update.
+    """
+    kernel32 = ctypes.windll.kernel32
+    kernel32.SetThreadExecutionState(
+        _ES_CONTINUOUS | _ES_SYSTEM_REQUIRED | _ES_DISPLAY_REQUIRED
+    )
+    try:
+        yield
+    finally:
+        kernel32.SetThreadExecutionState(_ES_CONTINUOUS)
 
 
 def _require_automation():
@@ -1287,13 +1320,17 @@ def _open_report(
         window.handle for window in desktop_uia.windows() if window.is_visible()
     }
 
-    # Un clic sobre el menú (real o visual) a veces no llega a registrarse
-    # en este WinForms owner-drawn (posible carrera entre el pintado del
-    # menú y el evento de clic simulado): si la ventana de informe nunca
-    # aparece visualmente en el primer intento, se reintenta el ciclo
-    # completo (clic derecho + activar 'Ver informes' + esperar) una vez
-    # más antes de recurrir al método de enumeración, propenso a ventanas
-    # fantasma.
+    # Un solo intento de clic sobre el menu (real o visual) por fila. Se
+    # probo reintentar el ciclo completo (clic derecho + activar 'Ver
+    # informes' + esperar) una segunda vez cuando el primero no se
+    # confirmaba visualmente, pero eso invoca 'Ver informes' dos veces
+    # seguidas sobre la misma fila cuando Vue PACS aun puede estar
+    # procesando la primera peticion (aunque a nosotros no nos parezca
+    # que paso nada): se vio en la practica que eso deja el comando 'Ver
+    # informes' sin responder hasta reiniciar Vue PACS, sin ventanas
+    # huerfanas ni error visible. Por eso ahora, si el primer clic no se
+    # confirma, se pasa directo al metodo de enumeracion (solo observa,
+    # nunca vuelve a hacer clic) en vez de reintentar.
     def _new_real_windows() -> list:
         return [
             window
@@ -1340,7 +1377,7 @@ def _open_report(
                 return found or True
         return []
 
-    max_attempts = 2
+    max_attempts = 1
     last_score = 0.0
     for attempt in range(1, max_attempts + 1):
         window, visual_score = _activate_report_menu_and_locate_visually(
@@ -1383,10 +1420,12 @@ def _open_report(
                 "reintentando el clic sobre 'Ver informes'."
             )
     else:
+        palabra_intento = "intento" if max_attempts == 1 else "intentos"
         print(
             "Reconocimiento visual de la ventana de informe: sin coincidencia "
-            f"tras {max_attempts} intentos (mejor puntaje visto: {last_score:.3f}, "
-            f"umbral: {VISUAL_MATCH_THRESHOLD:.3f}); se usa el método de respaldo."
+            f"tras {max_attempts} {palabra_intento} (mejor puntaje visto: "
+            f"{last_score:.3f}, umbral: {VISUAL_MATCH_THRESHOLD:.3f}); se usa el "
+            "método de respaldo."
         )
 
     def _close_others(chosen, windows) -> None:
@@ -1553,6 +1592,27 @@ def _selected_row_rect(main_window):
     return None
 
 
+# Altura de fila medida directamente sobre la tabla real de Vue PACS
+# (~37 px). Un solo {DOWN} deberia moverse dentro de este rango; fuera de
+# el, es senal de que el foco de teclado no estaba realmente en la lista
+# (fila sin cambios) o de que salto mas de una fila.
+_ALTURA_FILA_MINIMA = 20
+_ALTURA_FILA_MAXIMA = 65
+
+
+def _avance_de_una_fila_es_plausible(fila_antes, fila_despues):
+    if fila_despues is None:
+        return False
+    if fila_antes is None:
+        # Sin referencia previa no se puede validar el salto; se acepta
+        # tal cual para no bloquear el primer avance de la tanda.
+        return True
+    _, top_antes, _, bottom_antes = fila_antes
+    _, top_despues, _, bottom_despues = fila_despues
+    salto = ((top_despues + bottom_despues) // 2) - ((top_antes + bottom_antes) // 2)
+    return _ALTURA_FILA_MINIMA <= salto <= _ALTURA_FILA_MAXIMA
+
+
 def capture_reports(
     output: Path,
     title_pattern: str,
@@ -1566,6 +1626,7 @@ def capture_reports(
     saved = 0
     duplicates = 0
     skipped = 0
+    consecutive_skips = 0
     print(
         f"Captura supervisada: máximo {max_cases} informes. "
         "Mantén F12 pulsado para detener."
@@ -1688,19 +1749,37 @@ def capture_reports(
             candidate = build_review_candidate(parse_report(copied))
             if append_candidate(output, candidate):
                 saved += 1
+                consecutive_skips = 0
                 print(f"Guardado local: {candidate['review_case_id']}")
             else:
                 duplicates += 1
+                consecutive_skips = 0
                 print("Duplicado omitido.")
         except UnparseableReportError as error:
-            # A diferencia de un fallo de automatizacion (ventana no
-            # encontrada, puntero fuera de Vue PACS, etc.), esto solo
-            # significa que ESTA fila no tiene el formato esperado (p.ej.
-            # un adendum). No hay motivo para detener el resto de la
-            # tanda: se registra como omitida y se sigue con la fila
-            # siguiente.
+            # Esto solo significa que ESTA fila no tiene el formato
+            # esperado (p.ej. un adendum): se registra como omitida y se
+            # sigue con la fila siguiente.
             skipped += 1
+            consecutive_skips += 1
             print(f"Fila omitida (no reconocida): {error}")
+        except CaptureError as error:
+            # Un fallo de automatizacion en ESTA fila concreta (ventana no
+            # encontrada, portapapeles vacio tras agotar reintentos,
+            # 'Seleccionar todo' no localizado, etc.) tampoco detiene toda
+            # la tanda: se salta y se sigue. Pero una racha de varios
+            # fallos seguidos si es motivo real para parar (algo se rompio
+            # de fondo: Vue PACS se cerro, perdio el foco, cambio de
+            # pantalla), en vez de saltar filas a ciegas sin que el
+            # radiologo se entere.
+            skipped += 1
+            consecutive_skips += 1
+            print(f"Fila omitida (fallo al abrir o copiar): {error}")
+            if consecutive_skips >= CONSECUTIVE_SKIP_LIMIT:
+                raise CaptureError(
+                    f"{consecutive_skips} filas seguidas fallaron; "
+                    "puede haber un problema de fondo (Vue PACS cerrado, "
+                    "sin foco, u otra ventana encima). Captura detenida."
+                ) from error
         finally:
             _clear_clipboard()
             if report_window is not None:
@@ -1721,8 +1800,6 @@ def capture_reports(
                     break
                 time.sleep(0.1)
             _require_vue_focus(main_window)
-            keyboard.send_keys("{DOWN}")
-            time.sleep(0.5)
             # {DOWN} si mueve la fila resaltada (comprobado directamente),
             # pero el clic derecho de esta plantilla de Vue PACS actua
             # sobre la fila bajo el PUNTERO, no sobre la resaltada. Sin
@@ -1731,12 +1808,41 @@ def capture_reports(
             # informe (se vio en la practica, detectado solo gracias a la
             # deduplicacion por huella de contenido).
             if list_column_x is not None:
-                row_rect = _selected_row_rect(main_window)
+                fila_antes = _selected_row_rect(main_window)
+
+                def _avanzar_una_fila():
+                    keyboard.send_keys("{DOWN}")
+                    time.sleep(0.5)
+                    return _selected_row_rect(main_window)
+
+                row_rect = _avanzar_una_fila()
+                if not _avance_de_una_fila_es_plausible(fila_antes, row_rect):
+                    # Tras una fila que fallo (nunca se abrio ninguna
+                    # ventana, o el cierre de una ventana devolvio el foco
+                    # a otro control), el {DOWN} a veces no mueve la
+                    # seleccion de forma fiable, o salta mas de una fila
+                    # (se vio en la practica: avanzaba a filas distintas
+                    # pero no correlativas). Se restaura el foco haciendo
+                    # clic sobre la ultima fila conocida antes de
+                    # reintentar el avance, en vez de fiarse a ciegas de
+                    # un unico {DOWN}.
+                    if fila_antes is not None:
+                        _, top_antes, _, bottom_antes = fila_antes
+                        mouse.click(
+                            button="left",
+                            coords=(list_column_x, (top_antes + bottom_antes) // 2),
+                        )
+                        time.sleep(0.3)
+                        _require_vue_focus(main_window)
+                    row_rect = _avanzar_una_fila()
                 if row_rect is not None:
                     _, row_top, _, row_bottom = row_rect
                     row_y = (row_top + row_bottom) // 2
                     mouse.move(coords=(list_column_x, row_y))
                     time.sleep(0.2)
+            else:
+                keyboard.send_keys("{DOWN}")
+                time.sleep(0.5)
     return saved, duplicates, skipped
 
 
@@ -1902,8 +2008,8 @@ def main() -> None:
     parser.add_argument("--output", type=Path, default=DEFAULT_OUTPUT)
     args = parser.parse_args()
 
-    if args.max_cases < 1 or args.max_cases > 5:
-        raise SystemExit("El prototipo permite entre 1 y 5 casos por ejecución.")
+    if args.max_cases < 1 or args.max_cases > 500:
+        raise SystemExit("El prototipo permite entre 1 y 500 casos por ejecución.")
     if args.capture and not args.confirm_read_only:
         raise SystemExit("La captura requiere --confirm-read-only.")
 
@@ -1915,12 +2021,13 @@ def main() -> None:
         elif args.diagnose_clipboard:
             diagnose_clipboard()
         else:
-            saved, duplicates, skipped = capture_reports(
-                args.output,
-                args.window_title_pattern,
-                args.max_cases,
-                args.timeout,
-            )
+            with _keep_system_awake():
+                saved, duplicates, skipped = capture_reports(
+                    args.output,
+                    args.window_title_pattern,
+                    args.max_cases,
+                    args.timeout,
+                )
             print(
                 f"Finalizado: {saved} guardados, {duplicates} duplicados, "
                 f"{skipped} omitidos (no reconocidos)."

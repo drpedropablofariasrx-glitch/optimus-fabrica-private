@@ -1184,21 +1184,23 @@ class CapturarVuePacsTests(unittest.TestCase):
 
     def test_capture_limit_is_enforced_before_automation_starts(self):
         result = subprocess.run(
-            [sys.executable, str(SCRIPT), "--capture", "--confirm-read-only", "--max-cases", "6"],
+            [sys.executable, str(SCRIPT), "--capture", "--confirm-read-only", "--max-cases", "501"],
             capture_output=True,
             text=True,
             check=False,
         )
 
         self.assertNotEqual(result.returncode, 0)
-        self.assertIn("entre 1 y 5", result.stderr)
+        self.assertIn("entre 1 y 500", result.stderr)
 
-    def test_visual_capture_allows_up_to_five_cases(self):
-        # En este entorno de pruebas (Linux) --capture fallará más adelante
-        # por falta de automatización nativa de Windows; lo que valida este
-        # test es que --max-cases 5 ya no se rechaza de entrada con el
-        # mensaje "limitada a un caso" que existía cuando la captura visual
-        # era nueva y solo se permitía un caso por ejecución.
+    def test_visual_capture_allows_up_to_five_hundred_cases(self):
+        # Lo que valida este test es que --max-cases 500 no se rechaza de
+        # entrada con ningun mensaje de limite de los topes anteriores (1,
+        # 5 o 50). Se usa un patron de titulo que nunca puede coincidir con
+        # nada real, para que _find_main_window falle rapido y el test no
+        # dependa de si hay o no una ventana de Vue PACS abierta de verdad
+        # en el equipo donde corre la suite (y no toque la automatizacion
+        # real ni el raton).
         result = subprocess.run(
             [
                 sys.executable,
@@ -1206,7 +1208,9 @@ class CapturarVuePacsTests(unittest.TestCase):
                 "--capture",
                 "--confirm-read-only",
                 "--max-cases",
-                "5",
+                "500",
+                "--window-title-pattern",
+                "esta-ventana-de-prueba-nunca-existe-de-verdad",
             ],
             capture_output=True,
             text=True,
@@ -1215,6 +1219,45 @@ class CapturarVuePacsTests(unittest.TestCase):
 
         self.assertNotIn("limitada a un caso", result.stderr)
         self.assertNotIn("entre 1 y 5", result.stderr)
+        self.assertNotIn("entre 1 y 50", result.stderr)
+        self.assertNotIn("entre 1 y 500", result.stderr)
+
+
+class KeepSystemAwakeTests(unittest.TestCase):
+    def test_prevents_sleep_on_enter_and_releases_on_exit(self):
+        calls = []
+        fake_kernel32 = MagicMock()
+        fake_kernel32.SetThreadExecutionState.side_effect = (
+            lambda flags: calls.append(flags)
+        )
+        with patch.object(MODULE.ctypes, "windll") as fake_windll:
+            fake_windll.kernel32 = fake_kernel32
+            with MODULE._keep_system_awake():
+                pass
+
+        self.assertEqual(
+            calls,
+            [
+                MODULE._ES_CONTINUOUS
+                | MODULE._ES_SYSTEM_REQUIRED
+                | MODULE._ES_DISPLAY_REQUIRED,
+                MODULE._ES_CONTINUOUS,
+            ],
+        )
+
+    def test_releases_even_when_body_raises(self):
+        calls = []
+        fake_kernel32 = MagicMock()
+        fake_kernel32.SetThreadExecutionState.side_effect = (
+            lambda flags: calls.append(flags)
+        )
+        with patch.object(MODULE.ctypes, "windll") as fake_windll:
+            fake_windll.kernel32 = fake_kernel32
+            with self.assertRaises(RuntimeError):
+                with MODULE._keep_system_awake():
+                    raise RuntimeError("boom")
+
+        self.assertEqual(calls[-1], MODULE._ES_CONTINUOUS)
 
 
 if __name__ == "__main__":
